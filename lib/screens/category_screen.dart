@@ -109,7 +109,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
         : Colors.blue;
     
     try {
-      return showDialog(
+      await showDialog(
         context: context,
         builder: (context) {
           return StatefulBuilder(
@@ -249,7 +249,9 @@ class _CategoryScreenState extends State<CategoryScreen> {
         },
       );
     } finally {
-      // Make sure to dispose focus nodes
+      // Dispose controllers and focus nodes
+      nameController.dispose();
+      descriptionController.dispose();
       nameFocusNode.dispose();
       descriptionFocusNode.dispose();
     }
