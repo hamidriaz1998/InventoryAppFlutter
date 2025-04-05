@@ -44,7 +44,7 @@ class _InventoryHomePageState extends State<InventoryHomePage>
   String _searchQuery = '';
   int? _selectedCategoryId;
   List<Category> _categories = [];
-
+  final FocusNode _searchFocusNode = FocusNode(); // Add this line
   final TextEditingController _searchController = TextEditingController();
 
   @override
@@ -58,6 +58,7 @@ class _InventoryHomePageState extends State<InventoryHomePage>
   void dispose() {
     _tabController.dispose();
     _searchController.dispose();
+    _searchFocusNode.dispose(); // Add this line
     super.dispose();
   }
 
@@ -142,58 +143,340 @@ class _InventoryHomePageState extends State<InventoryHomePage>
         return;
       }
 
+      // Show loading indicator
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Generating PDF report...')),
+        );
+      }
+
       final pdf = pw.Document();
 
-      // Add a page to the PDF
+      // Calculate inventory statistics
+      final totalItems = _items.length;
+      final totalCategories = _categories.length;
+      final totalValue = _calculateTotalValue();
+      final lowStockItems = _items.where((item) => item.quantity < 10).toList();
+
+      // Group items by category
+      final categoryMap = <String, List<Item>>{};
+      for (final item in _items) {
+        String categoryName = 'Uncategorized';
+        if (item.categoryId != null) {
+          final category = _categories.firstWhere(
+            (c) => c.id == item.categoryId,
+            orElse: () => Category(name: 'Uncategorized'),
+          );
+          categoryName = category.name;
+        }
+
+        if (!categoryMap.containsKey(categoryName)) {
+          categoryMap[categoryName] = [];
+        }
+        categoryMap[categoryName]!.add(item);
+      }
+
+      // Cover page
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          build: (pw.Context context) {
+            return pw.Center(
+              child: pw.Column(
+                mainAxisAlignment: pw.MainAxisAlignment.center,
+                children: [
+                  pw.Text(
+                    'INVENTORY REPORT',
+                    style: pw.TextStyle(
+                      fontSize: 28,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                  pw.SizedBox(height: 20),
+                  pw.Text(
+                    _currentUser?.username ?? 'Inventory Management',
+                    style: const pw.TextStyle(fontSize: 20),
+                  ),
+                  pw.SizedBox(height: 10),
+                  pw.Text(
+                    'Generated on ${DateFormat('MMMM dd, yyyy').format(DateTime.now())}',
+                    style: const pw.TextStyle(fontSize: 16),
+                  ),
+                  pw.SizedBox(height: 10),
+                  pw.Text(
+                    'at ${DateFormat('hh:mm a').format(DateTime.now())}',
+                    style: const pw.TextStyle(fontSize: 16),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      );
+
+      // Summary page
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(32),
+          build: (pw.Context context) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Header(
+                  level: 0,
+                  child: pw.Text('Inventory Summary'),
+                ),
+                pw.SizedBox(height: 20),
+
+                // Summary table
+                pw.Table(
+                  border: pw.TableBorder.all(),
+                  children: [
+                    pw.TableRow(
+                      decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+                      children: [
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(8),
+                          child: pw.Text(
+                            'Metric',
+                            style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                          ),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(8),
+                          child: pw.Text(
+                            'Value',
+                            style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                    _buildSummaryRow('Total Items', totalItems.toString()),
+                    _buildSummaryRow('Total Categories', totalCategories.toString()),
+                    _buildSummaryRow('Total Inventory Value', '\$${totalValue.toStringAsFixed(2)}'),
+                    _buildSummaryRow('Low Stock Items', lowStockItems.length.toString()),
+                  ],
+                ),
+
+                pw.SizedBox(height: 30),
+
+                pw.Text(
+                  'Category Distribution',
+                  style: pw.TextStyle(
+                    fontSize: 16,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                pw.SizedBox(height: 10),
+
+                // Category distribution
+                pw.Table(
+                  border: pw.TableBorder.all(),
+                  children: [
+                    pw.TableRow(
+                      decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+                      children: [
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(8),
+                          child: pw.Text(
+                            'Category',
+                            style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                          ),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(8),
+                          child: pw.Text(
+                            'Items',
+                            style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                          ),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(8),
+                          child: pw.Text(
+                            'Value',
+                            style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                    ...categoryMap.entries.map((entry) {
+                      final categoryValue = entry.value.fold(
+                        0.0,
+                        (sum, item) => sum + (item.price * item.quantity),
+                      );
+                      return pw.TableRow(
+                        children: [
+                          pw.Padding(
+                            padding: const pw.EdgeInsets.all(8),
+                            child: pw.Text(entry.key),
+                          ),
+                          pw.Padding(
+                            padding: const pw.EdgeInsets.all(8),
+                            child: pw.Text(entry.value.length.toString()),
+                          ),
+                          pw.Padding(
+                            padding: const pw.EdgeInsets.all(8),
+                            child: pw.Text('\$${categoryValue.toStringAsFixed(2)}'),
+                          ),
+                        ],
+                      );
+                    }),
+                  ],
+                ),
+              ],
+            );
+          },
+        ),
+      );
+
+      // Low stock items page
+      if (lowStockItems.isNotEmpty) {
+        pdf.addPage(
+          pw.Page(
+            pageFormat: PdfPageFormat.a4,
+            margin: const pw.EdgeInsets.all(32),
+            build: (pw.Context context) {
+              return pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Header(
+                    level: 0,
+                    child: pw.Text('Low Stock Items'),
+                  ),
+                  pw.Paragraph(
+                    text: 'Items with quantity less than 10 units',
+                  ),
+                  pw.SizedBox(height: 20),
+                  pw.Table.fromTextArray(
+                    context: context,
+                    border: null,
+                    headerDecoration: const pw.BoxDecoration(color: PdfColors.grey300),
+                    headerHeight: 25,
+                    cellHeight: 40,
+                    headerStyle: pw.TextStyle(
+                      color: PdfColors.black,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                    cellStyle: const pw.TextStyle(color: PdfColors.black),
+                    headers: ['Item', 'Category', 'Quantity', 'Price'],
+                    data: lowStockItems
+                      .map(
+                        (item) => [
+                          item.name,
+                          _getCategoryName(item.categoryId) ?? 'N/A',
+                          item.quantity.toString(),
+                          '\$${item.price.toStringAsFixed(2)}',
+                        ],
+                      )
+                      .toList(),
+                  ),
+                ],
+              );
+            },
+          ),
+        );
+      }
+
+      // Category-wise inventory pages
+      for (final entry in categoryMap.entries) {
+        final categoryName = entry.key;
+        final categoryItems = entry.value;
+
+        pdf.addPage(
+          pw.Page(
+            pageFormat: PdfPageFormat.a4,
+            margin: const pw.EdgeInsets.all(32),
+            build: (pw.Context context) {
+              return pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Header(
+                    level: 0,
+                    child: pw.Text('Category: $categoryName'),
+                  ),
+                  pw.SizedBox(height: 10),
+                  pw.Paragraph(
+                    text: 'Total Items: ${categoryItems.length}',
+                  ),
+                  pw.Paragraph(
+                    text: 'Total Value: \$${categoryItems.fold(0.0, (sum, item) => sum + (item.price * item.quantity)).toStringAsFixed(2)}',
+                  ),
+                  pw.SizedBox(height: 20),
+                  pw.Table.fromTextArray(
+                    context: context,
+                    border: null,
+                    headerDecoration: const pw.BoxDecoration(color: PdfColors.grey300),
+                    headerHeight: 25,
+                    cellHeight: 40,
+                    headerStyle: pw.TextStyle(
+                      color: PdfColors.black,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                    cellStyle: const pw.TextStyle(color: PdfColors.black),
+                    headers: ['Item', 'Quantity', 'Unit Price', 'Total Value'],
+                    data: categoryItems
+                      .map(
+                        (item) => [
+                          item.name,
+                          item.quantity.toString(),
+                          '\$${item.price.toStringAsFixed(2)}',
+                          '\$${(item.price * item.quantity).toStringAsFixed(2)}',
+                        ],
+                      )
+                      .toList(),
+                  ),
+                ],
+              );
+            },
+          ),
+        );
+      }
+
+      // Full inventory list
       pdf.addPage(
         pw.MultiPage(
           pageFormat: PdfPageFormat.a4,
           margin: const pw.EdgeInsets.all(32),
-          build:
-              (pw.Context context) => [
-                pw.Header(
-                  level: 0,
-                  child: pw.Text(
-                    'Inventory Report',
-                    style: pw.TextStyle(fontSize: 24),
-                  ),
-                ),
-                pw.Paragraph(
-                  text:
-                      'Generated on ${DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now())}',
-                ),
-                pw.SizedBox(height: 20),
-                pw.Table.fromTextArray(
-                  context: context,
-                  headerDecoration: pw.BoxDecoration(color: PdfColors.grey300),
-                  headerHeight: 25,
-                  cellHeight: 40,
-                  headerStyle: pw.TextStyle(
-                    color: PdfColors.black,
-                    fontWeight: pw.FontWeight.bold,
-                  ),
-                  cellStyle: const pw.TextStyle(color: PdfColors.black),
-                  headers: ['Item', 'Category', 'Quantity', 'Price'],
-                  data:
-                      _items
-                          .map(
-                            (item) => [
-                              item.name,
-                              _getCategoryName(item.categoryId) ?? 'N/A',
-                              item.quantity.toString(),
-                              '\$${item.price.toStringAsFixed(2)}',
-                            ],
-                          )
-                          .toList(),
-                ),
-              ],
+          build: (pw.Context context) => [
+            pw.Header(
+              level: 0,
+              child: pw.Text('Complete Inventory List'),
+            ),
+            pw.Paragraph(
+              text: 'Generated on ${DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now())}',
+            ),
+            pw.SizedBox(height: 20),
+            pw.Table.fromTextArray(
+              context: context,
+              border: null,
+              headerDecoration: const pw.BoxDecoration(color: PdfColors.grey300),
+              headerHeight: 25,
+              cellHeight: 40,
+              headerStyle: pw.TextStyle(
+                color: PdfColors.black,
+                fontWeight: pw.FontWeight.bold,
+              ),
+              cellStyle: const pw.TextStyle(color: PdfColors.black),
+              headers: ['Item', 'Category', 'Quantity', 'Unit Price', 'Total Value'],
+              data: _items
+                .map(
+                  (item) => [
+                    item.name,
+                    _getCategoryName(item.categoryId) ?? 'N/A',
+                    item.quantity.toString(),
+                    '\$${item.price.toStringAsFixed(2)}',
+                    '\$${(item.price * item.quantity).toStringAsFixed(2)}',
+                  ],
+                )
+                .toList(),
+            ),
+          ],
         ),
       );
 
-      // Use a more reliable way to save the file
-      // Directory? directory;
+      // Save the file
       var directory = '/storage/emulated/0/Inventory_App';
-      // if path does not exist on android create it
       if (Platform.isAndroid) {
         final dir = Directory(directory);
         if (!await dir.exists()) {
@@ -201,20 +484,8 @@ class _InventoryHomePageState extends State<InventoryHomePage>
         }
       }
 
-      // if (Platform.isAndroid) {
-      //   // For Android, use the downloads directory
-      //   directory = await getExternalStorageDirectory();
-
-      //   // If cannot access external storage, fall back to app documents directory
-      //   if (directory == null) {
-      //     directory = await getApplicationDocumentsDirectory();
-      //   }
-      // } else {
-      //   // For iOS and other platforms
-      //   directory = await getApplicationDocumentsDirectory();
-      // }
-
-      final path = '$directory/inventory_report.pdf';
+      final fileName = 'inventory_report_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.pdf';
+      final path = '$directory/$fileName';
       final file = File(path);
       await file.writeAsBytes(await pdf.save());
 
@@ -222,7 +493,7 @@ class _InventoryHomePageState extends State<InventoryHomePage>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('PDF saved to: ${file.path}'),
+            content: Text('PDF saved to: $path'),
             duration: const Duration(seconds: 5),
             action: SnackBarAction(label: 'OK', onPressed: () {}),
           ),
@@ -235,6 +506,21 @@ class _InventoryHomePageState extends State<InventoryHomePage>
         );
       }
     }
+  }
+
+  pw.TableRow _buildSummaryRow(String label, String value) {
+    return pw.TableRow(
+      children: [
+        pw.Padding(
+          padding: const pw.EdgeInsets.all(8),
+          child: pw.Text(label),
+        ),
+        pw.Padding(
+          padding: const pw.EdgeInsets.all(8),
+          child: pw.Text(value),
+        ),
+      ],
+    );
   }
 
   String? _getCategoryName(int? categoryId) {
@@ -422,6 +708,16 @@ class _InventoryHomePageState extends State<InventoryHomePage>
               Expanded(
                 child: TextField(
                   controller: _searchController,
+                  focusNode: _searchFocusNode, // Add this line
+                  textInputAction: TextInputAction.search, // Add this line
+                  onSubmitted: (value) { // Add this handler
+                    // This will run when the search/done button is pressed
+                    _searchFocusNode.unfocus();
+                    setState(() {
+                      _searchQuery = value;
+                    });
+                    _loadItems();
+                  },
                   decoration: InputDecoration(
                     hintText: 'Search items...',
                     prefixIcon: const Icon(Icons.search),

@@ -16,6 +16,11 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
+  
+  // Add focus nodes
+  final _usernameFocusNode = FocusNode();
+  final _passwordFocusNode = FocusNode();
+  
   bool _isLoading = false;
   String? _errorMessage;
 
@@ -23,6 +28,8 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _usernameController.dispose();
     _passwordController.dispose();
+    _usernameFocusNode.dispose();
+    _passwordFocusNode.dispose();
     super.dispose();
   }
 
@@ -94,6 +101,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 20),
                     TextFormField(
                       controller: _usernameController,
+                      focusNode: _usernameFocusNode,
+                      textInputAction: TextInputAction.next,
+                      onFieldSubmitted: (_) {
+                        FocusScope.of(context).requestFocus(_passwordFocusNode);
+                      },
                       decoration: const InputDecoration(
                         labelText: 'Username',
                         border: OutlineInputBorder(),
@@ -109,6 +121,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _passwordController,
+                      focusNode: _passwordFocusNode,
+                      textInputAction: TextInputAction.done,
+                      onFieldSubmitted: (_) {
+                        if (!_isLoading) _login();
+                      },
                       decoration: const InputDecoration(
                         labelText: 'Password',
                         border: OutlineInputBorder(),

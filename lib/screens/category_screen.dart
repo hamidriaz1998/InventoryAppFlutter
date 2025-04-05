@@ -99,143 +99,160 @@ class _CategoryScreenState extends State<CategoryScreen> {
     final nameController = TextEditingController(text: category?.name ?? '');
     final descriptionController = TextEditingController(text: category?.description ?? '');
     
+    // Add focus nodes
+    final nameFocusNode = FocusNode();
+    final descriptionFocusNode = FocusNode();
+    
     // Default color
-     Color selectedColor = category?.color != null 
+    Color selectedColor = category?.color != null 
         ? Color(int.parse(category!.color!.replaceAll('#', '0xFF'))) 
         : Colors.blue;
     
-    return showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: Text(category == null ? 'Add Category' : 'Edit Category'),
-              content: Form(
-                key: _formKey,
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      TextFormField(
-                        controller: nameController,
-                        decoration: const InputDecoration(
-                          labelText: 'Name',
-                          border: OutlineInputBorder(),
+    try {
+      return showDialog(
+        context: context,
+        builder: (context) {
+          return StatefulBuilder(
+            builder: (context, setState) {
+              return AlertDialog(
+                title: Text(category == null ? 'Add Category' : 'Edit Category'),
+                content: Form(
+                  key: _formKey,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TextFormField(
+                          controller: nameController,
+                          focusNode: nameFocusNode,
+                          textInputAction: TextInputAction.next,
+                          onFieldSubmitted: (_) {
+                            FocusScope.of(context).requestFocus(descriptionFocusNode);
+                          },
+                          decoration: const InputDecoration(
+                            labelText: 'Name',
+                            border: OutlineInputBorder(),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter a name';
+                            }
+                            return null;
+                          },
                         ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter a name';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: descriptionController,
-                        decoration: const InputDecoration(
-                          labelText: 'Description (optional)',
-                          border: OutlineInputBorder(),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: descriptionController,
+                          focusNode: descriptionFocusNode,
+                          textInputAction: TextInputAction.done,
+                          decoration: const InputDecoration(
+                            labelText: 'Description (optional)',
+                            border: OutlineInputBorder(),
+                          ),
+                          maxLines: 2,
                         ),
-                        maxLines: 2,
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          const Text('Color: '),
-                          const SizedBox(width: 10),
-                          GestureDetector(
-                            onTap: () {
-                              showDialog(
-                                context: context,
-                                builder: (BuildContext context) {
-                                  return StatefulBuilder(
-                                    builder: (context, setState) {
-                                      return AlertDialog(
-                                        title: const Text('Pick a color'),
-                                        content: SingleChildScrollView(
-                                          child: ColorPicker(
-                                            pickerColor: selectedColor,
-                                            onColorChanged: (Color color) {
-                                              setState(() {
-                                                selectedColor = color;
-                                              });
-                                            },
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            const Text('Color: '),
+                            const SizedBox(width: 10),
+                            GestureDetector(
+                              onTap: () {
+                                showDialog(
+                                  context: context,
+                                  builder: (BuildContext context) {
+                                    return StatefulBuilder(
+                                      builder: (context, setState) {
+                                        return AlertDialog(
+                                          title: const Text('Pick a color'),
+                                          content: SingleChildScrollView(
+                                            child: ColorPicker(
+                                              pickerColor: selectedColor,
+                                              onColorChanged: (Color color) {
+                                                setState(() {
+                                                  selectedColor = color;
+                                                });
+                                              },
+                                            ),
                                           ),
-                                        ),
-                                        actions: <Widget>[
-                                          TextButton(
-                                            child: const Text('Select'),
-                                            onPressed: () {
-                                              Navigator.of(context).pop();
-                                            },
-                                          ),
-                                        ],
-                                      );
-                                    },
-                                  );
-                                },
-                              );
-                            },
-                            child: Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: selectedColor,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.black),
+                                          actions: <Widget>[
+                                            TextButton(
+                                              child: const Text('Select'),
+                                              onPressed: () {
+                                                Navigator.of(context).pop();
+                                              },
+                                            ),
+                                          ],
+                                        );
+                                      },
+                                    );
+                                  },
+                                );
+                              },
+                              child: Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: selectedColor,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.black),
+                                ),
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ],
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: () async {
-                    if (_formKey.currentState!.validate()) {
-                      final colorHex = '#${selectedColor.value.toRadixString(16).substring(2)}';
-                      
-                      if (category == null) {
-                        // Create new category
-                        await widget.dbHelper.insertCategory(
-                          Category(
-                            name: nameController.text,
-                            description: descriptionController.text,
-                            color: colorHex,
-                          ),
-                        );
-                      } else {
-                        // Update existing category
-                        await widget.dbHelper.updateCategory(
-                          Category(
-                            id: category.id,
-                            name: nameController.text,
-                            description: descriptionController.text,
-                            color: colorHex,
-                          ),
-                        );
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Cancel'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () async {
+                      if (_formKey.currentState!.validate()) {
+                        final colorHex = '#${selectedColor.value.toRadixString(16).substring(2)}';
+                        
+                        if (category == null) {
+                          // Create new category
+                          await widget.dbHelper.insertCategory(
+                            Category(
+                              name: nameController.text,
+                              description: descriptionController.text,
+                              color: colorHex,
+                            ),
+                          );
+                        } else {
+                          // Update existing category
+                          await widget.dbHelper.updateCategory(
+                            Category(
+                              id: category.id,
+                              name: nameController.text,
+                              description: descriptionController.text,
+                              color: colorHex,
+                            ),
+                          );
+                        }
+                        
+                        Navigator.pop(context);
+                        _refreshCategories();
                       }
-                      
-                      Navigator.pop(context);
-                      _refreshCategories();
-                    }
-                  },
-                  child: Text(category == null ? 'Add' : 'Save'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
+                    },
+                    child: Text(category == null ? 'Add' : 'Save'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+    } finally {
+      // Make sure to dispose focus nodes
+      nameFocusNode.dispose();
+      descriptionFocusNode.dispose();
+    }
   }
   
   Future<void> _deleteCategory(int id) async {

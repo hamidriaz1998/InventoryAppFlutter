@@ -32,6 +32,12 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
   final _priceController = TextEditingController();
   final _barcodeController = TextEditingController();
   
+  // Add focus nodes for each text field
+  final _nameFocusNode = FocusNode();
+  final _quantityFocusNode = FocusNode();
+  final _priceFocusNode = FocusNode();
+  final _barcodeFocusNode = FocusNode();
+  
   bool _isLoading = false;
   bool _isEditing = false;
   String _pageTitle = 'Add Item';
@@ -85,6 +91,13 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
     _quantityController.dispose();
     _priceController.dispose();
     _barcodeController.dispose();
+    
+    // Dispose focus nodes
+    _nameFocusNode.dispose();
+    _quantityFocusNode.dispose();
+    _priceFocusNode.dispose();
+    _barcodeFocusNode.dispose();
+    
     super.dispose();
   }
 
@@ -246,6 +259,11 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
             children: [
               TextFormField(
                 controller: _nameController,
+                focusNode: _nameFocusNode,
+                textInputAction: TextInputAction.next,
+                onFieldSubmitted: (_) {
+                  FocusScope.of(context).requestFocus(_quantityFocusNode);
+                },
                 decoration: const InputDecoration(
                   labelText: 'Item Name',
                   border: OutlineInputBorder(),
@@ -261,6 +279,11 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: _quantityController,
+                focusNode: _quantityFocusNode,
+                textInputAction: TextInputAction.next,
+                onFieldSubmitted: (_) {
+                  FocusScope.of(context).requestFocus(_priceFocusNode);
+                },
                 decoration: const InputDecoration(
                   labelText: 'Quantity',
                   border: OutlineInputBorder(),
@@ -301,6 +324,8 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
                         setState(() {
                           _selectedCategory = value;
                         });
+                        // Move focus to price field after selecting category
+                        FocusScope.of(context).requestFocus(_priceFocusNode);
                       },
                       hint: const Text('Select Category'),
                       validator: _categories.isNotEmpty ? (value) {
@@ -322,6 +347,11 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: _priceController,
+                focusNode: _priceFocusNode,
+                textInputAction: TextInputAction.next,
+                onFieldSubmitted: (_) {
+                  FocusScope.of(context).requestFocus(_barcodeFocusNode);
+                },
                 decoration: const InputDecoration(
                   labelText: 'Price (\$)',
                   border: OutlineInputBorder(),
@@ -344,6 +374,12 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: _barcodeController,
+                focusNode: _barcodeFocusNode,
+                textInputAction: TextInputAction.done,
+                onFieldSubmitted: (_) {
+                  // Submit the form when done is pressed on barcode field
+                  _submitForm();
+                },
                 decoration: const InputDecoration(
                   labelText: 'Barcode (Optional)',
                   border: OutlineInputBorder(),

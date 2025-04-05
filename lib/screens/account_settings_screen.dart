@@ -24,12 +24,21 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> with Sing
   final _profileFormKey = GlobalKey<FormState>();
   late TextEditingController _usernameController;
   late TextEditingController _emailController;
+  
+  // Profile form focus nodes
+  final _usernameFocusNode = FocusNode();
+  final _emailFocusNode = FocusNode();
 
   // Password form controllers
   final _passwordFormKey = GlobalKey<FormState>();
   final _currentPasswordController = TextEditingController();
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  
+  // Password form focus nodes
+  final _currentPasswordFocusNode = FocusNode();
+  final _newPasswordFocusNode = FocusNode();
+  final _confirmPasswordFocusNode = FocusNode();
 
   String? _errorMessage;
   String? _successMessage;
@@ -50,6 +59,14 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> with Sing
     _currentPasswordController.dispose();
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
+    
+    // Dispose focus nodes
+    _usernameFocusNode.dispose();
+    _emailFocusNode.dispose();
+    _currentPasswordFocusNode.dispose();
+    _newPasswordFocusNode.dispose();
+    _confirmPasswordFocusNode.dispose();
+    
     super.dispose();
   }
 
@@ -230,6 +247,11 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> with Sing
               ),
             TextFormField(
               controller: _usernameController,
+              focusNode: _usernameFocusNode,
+              textInputAction: TextInputAction.next,
+              onFieldSubmitted: (_) {
+                FocusScope.of(context).requestFocus(_emailFocusNode);
+              },
               decoration: const InputDecoration(
                 labelText: 'Username',
                 border: OutlineInputBorder(),
@@ -248,6 +270,11 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> with Sing
             const SizedBox(height: 16),
             TextFormField(
               controller: _emailController,
+              focusNode: _emailFocusNode,
+              textInputAction: TextInputAction.done,
+              onFieldSubmitted: (_) {
+                if (!_isLoading) _updateProfile();
+              },
               decoration: const InputDecoration(
                 labelText: 'Email',
                 border: OutlineInputBorder(),
@@ -317,6 +344,11 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> with Sing
               ),
             TextFormField(
               controller: _currentPasswordController,
+              focusNode: _currentPasswordFocusNode,
+              textInputAction: TextInputAction.next,
+              onFieldSubmitted: (_) {
+                FocusScope.of(context).requestFocus(_newPasswordFocusNode);
+              },
               decoration: const InputDecoration(
                 labelText: 'Current Password',
                 border: OutlineInputBorder(),
@@ -333,6 +365,11 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> with Sing
             const SizedBox(height: 16),
             TextFormField(
               controller: _newPasswordController,
+              focusNode: _newPasswordFocusNode,
+              textInputAction: TextInputAction.next,
+              onFieldSubmitted: (_) {
+                FocusScope.of(context).requestFocus(_confirmPasswordFocusNode);
+              },
               decoration: const InputDecoration(
                 labelText: 'New Password',
                 border: OutlineInputBorder(),
@@ -352,6 +389,11 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> with Sing
             const SizedBox(height: 16),
             TextFormField(
               controller: _confirmPasswordController,
+              focusNode: _confirmPasswordFocusNode,
+              textInputAction: TextInputAction.done,
+              onFieldSubmitted: (_) {
+                if (!_isLoading) _changePassword();
+              },
               decoration: const InputDecoration(
                 labelText: 'Confirm New Password',
                 border: OutlineInputBorder(),

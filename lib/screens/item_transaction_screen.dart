@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
 import '../db/database_helper.dart';
 import '../models/item.dart';
 
@@ -31,14 +30,18 @@ class _ItemTransactionScreenState extends State<ItemTransactionScreen> {
   final _quantityController = TextEditingController();
   final _priceController = TextEditingController();
   final _notesController = TextEditingController();
+  
+  // Add focus nodes
+  final _quantityFocusNode = FocusNode();
+  final _priceFocusNode = FocusNode();
+  final _notesFocusNode = FocusNode();
+  
   bool _isProcessing = false;
-  int _availableQuantity = 0;
   double _totalAmount = 0.0;
 
   @override
   void initState() {
     super.initState();
-    _availableQuantity = widget.item.quantity;
     _priceController.text = widget.item.price.toStringAsFixed(2);
     _calculateTotal();
     
@@ -51,6 +54,12 @@ class _ItemTransactionScreenState extends State<ItemTransactionScreen> {
     _quantityController.dispose();
     _priceController.dispose();
     _notesController.dispose();
+    
+    // Dispose focus nodes
+    _quantityFocusNode.dispose();
+    _priceFocusNode.dispose();
+    _notesFocusNode.dispose();
+    
     super.dispose();
   }
 
@@ -186,6 +195,11 @@ class _ItemTransactionScreenState extends State<ItemTransactionScreen> {
               // Transaction form
               TextFormField(
                 controller: _quantityController,
+                focusNode: _quantityFocusNode,
+                textInputAction: TextInputAction.next,
+                onFieldSubmitted: (_) {
+                  FocusScope.of(context).requestFocus(_priceFocusNode);
+                },
                 decoration: InputDecoration(
                   labelText: 'Quantity',
                   border: const OutlineInputBorder(),
@@ -218,6 +232,11 @@ class _ItemTransactionScreenState extends State<ItemTransactionScreen> {
               
               TextFormField(
                 controller: _priceController,
+                focusNode: _priceFocusNode,
+                textInputAction: TextInputAction.next,
+                onFieldSubmitted: (_) {
+                  FocusScope.of(context).requestFocus(_notesFocusNode);
+                },
                 decoration: const InputDecoration(
                   labelText: 'Unit Price (\$)',
                   border: OutlineInputBorder(),
@@ -245,6 +264,11 @@ class _ItemTransactionScreenState extends State<ItemTransactionScreen> {
               
               TextFormField(
                 controller: _notesController,
+                focusNode: _notesFocusNode,
+                textInputAction: TextInputAction.done,
+                onFieldSubmitted: (_) {
+                  if (!_isProcessing) _processTransaction();
+                },
                 decoration: const InputDecoration(
                   labelText: 'Notes (Optional)',
                   border: OutlineInputBorder(),

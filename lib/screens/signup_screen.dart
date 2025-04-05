@@ -18,6 +18,13 @@ class _SignupScreenState extends State<SignupScreen> {
   final _passwordController = TextEditingController();
   final _passwordConfirmController = TextEditingController();
   final _emailController = TextEditingController();
+
+  // Add focus nodes
+  final _usernameFocusNode = FocusNode();
+  final _emailFocusNode = FocusNode();
+  final _passwordFocusNode = FocusNode();
+  final _passwordConfirmFocusNode = FocusNode();
+
   bool _isLoading = false;
   String? _errorMessage;
 
@@ -27,6 +34,12 @@ class _SignupScreenState extends State<SignupScreen> {
     _passwordController.dispose();
     _passwordConfirmController.dispose();
     _emailController.dispose();
+
+    _usernameFocusNode.dispose();
+    _emailFocusNode.dispose();
+    _passwordFocusNode.dispose();
+    _passwordConfirmFocusNode.dispose();
+
     super.dispose();
   }
 
@@ -115,6 +128,11 @@ class _SignupScreenState extends State<SignupScreen> {
                     const SizedBox(height: 20),
                     TextFormField(
                       controller: _usernameController,
+                      focusNode: _usernameFocusNode,
+                      textInputAction: TextInputAction.next,
+                      onFieldSubmitted: (_) {
+                        FocusScope.of(context).requestFocus(_emailFocusNode);
+                      },
                       decoration: const InputDecoration(
                         labelText: 'Username',
                         border: OutlineInputBorder(),
@@ -133,6 +151,11 @@ class _SignupScreenState extends State<SignupScreen> {
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _emailController,
+                      focusNode: _emailFocusNode,
+                      textInputAction: TextInputAction.next,
+                      onFieldSubmitted: (_) {
+                        FocusScope.of(context).requestFocus(_passwordFocusNode);
+                      },
                       decoration: const InputDecoration(
                         labelText: 'Email',
                         border: OutlineInputBorder(),
@@ -153,6 +176,11 @@ class _SignupScreenState extends State<SignupScreen> {
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _passwordController,
+                      focusNode: _passwordFocusNode,
+                      textInputAction: TextInputAction.next,
+                      onFieldSubmitted: (_) {
+                        FocusScope.of(context).requestFocus(_passwordConfirmFocusNode);
+                      },
                       decoration: const InputDecoration(
                         labelText: 'Password',
                         border: OutlineInputBorder(),
@@ -172,6 +200,11 @@ class _SignupScreenState extends State<SignupScreen> {
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _passwordConfirmController,
+                      focusNode: _passwordConfirmFocusNode,
+                      textInputAction: TextInputAction.done,
+                      onFieldSubmitted: (_) {
+                        if (!_isLoading) _signup();
+                      },
                       decoration: const InputDecoration(
                         labelText: 'Confirm Password',
                         border: OutlineInputBorder(),
