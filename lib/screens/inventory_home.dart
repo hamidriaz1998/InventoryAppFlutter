@@ -650,17 +650,6 @@ class _InventoryHomePageState extends State<InventoryHomePage>
             onPressed: _generatePdfReport,
           ),
         ],
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: Colors.white,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          tabs: const [
-            Tab(icon: Icon(Icons.list), text: 'Items'),
-            Tab(icon: Icon(Icons.analytics), text: 'Dashboard'),
-            Tab(icon: Icon(Icons.settings), text: 'Settings'),
-          ],
-        ),
       ),
       body:
           _isLoading
@@ -673,6 +662,21 @@ class _InventoryHomePageState extends State<InventoryHomePage>
                   _buildSettingsTab(),
                 ],
               ),
+      bottomNavigationBar: Material(
+        color: theme.primaryColor,
+        child: TabBar(
+          controller: _tabController,
+          indicatorColor: Colors.white,
+          indicatorSize: TabBarIndicatorSize.label, // Add this to make indicator only appear under the label
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white70,
+          tabs: const [
+            Tab(icon: Icon(Icons.list), text: 'Items'),
+            Tab(icon: Icon(Icons.analytics), text: 'Dashboard'),
+            Tab(icon: Icon(Icons.settings), text: 'Settings'),
+          ],
+        ),
+      ),
       floatingActionButton:
           _tabController.index == 0
               ? FloatingActionButton(
