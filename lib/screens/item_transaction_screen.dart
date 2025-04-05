@@ -117,6 +117,7 @@ class _ItemTransactionScreenState extends State<ItemTransactionScreen> {
       
       await widget.dbHelper.updateItem(updatedItem);
       
+      // Call the onTransactionComplete callback to update the parent
       widget.onTransactionComplete();
       
       if (mounted) {

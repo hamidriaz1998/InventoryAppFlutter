@@ -477,7 +477,11 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
           item: widget.item!,
           userId: widget.userId,
           transactionType: TransactionType.sale,
-          onTransactionComplete: widget.onItemSaved,
+          onTransactionComplete: () {
+            // Force a rebuild of the widget to refresh transaction history
+            setState(() {});
+            widget.onItemSaved();
+          },
         ),
       ),
     );
@@ -493,13 +497,18 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
           item: widget.item!,
           userId: widget.userId,
           transactionType: TransactionType.restock,
-          onTransactionComplete: widget.onItemSaved,
+          onTransactionComplete: () {
+            // Force a rebuild of the widget to refresh transaction history
+            setState(() {});
+            widget.onItemSaved();
+          },
         ),
       ),
     );
   }
 
   Widget _buildTransactionHistory() {
+    // Make sure we rebuild this widget every time by not caching the future
     return FutureBuilder<List<Map<String, dynamic>>>(
       future: widget.dbHelper.getItemTransactions(widget.item!.id!),
       builder: (context, snapshot) {
