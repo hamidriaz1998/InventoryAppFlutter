@@ -206,6 +206,16 @@ class DatabaseHelper {
     return user.passwordHash == passwordHash;
   }
 
+  Future<int> updateUser(User user) async {
+    final db = await database;
+    return db.update(
+      'users',
+      user.toMap(),
+      where: 'id = ?',
+      whereArgs: [user.id],
+    );
+  }
+
   // Item operations
   Future<int> insertItem(Item item) async {
     final db = await database;

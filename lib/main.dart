@@ -134,8 +134,8 @@ class _MyAppState extends State<MyApp> {
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ButtonStyle(
-            backgroundColor: WidgetStateProperty.all<Color>(primaryColor),
-            foregroundColor: WidgetStateProperty.all<Color>(Colors.white),
+            backgroundColor: MaterialStateProperty.all<Color>(primaryColor),
+            foregroundColor: MaterialStateProperty.all<Color>(Colors.white),
           ),
         ),
       ),
@@ -162,11 +162,10 @@ class _MyAppState extends State<MyApp> {
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ButtonStyle(
-            backgroundColor: WidgetStateProperty.all<Color>(primaryColor),
-            foregroundColor: WidgetStateProperty.all<Color>(Colors.white
+            backgroundColor: MaterialStateProperty.all<Color>(primaryColor),
+            foregroundColor: MaterialStateProperty.all<Color>(Colors.white),
           ),
         ),
-      ),
       ),
       themeMode: _isDarkMode ? ThemeMode.dark : ThemeMode.light,
       home: widget.isLoggedIn

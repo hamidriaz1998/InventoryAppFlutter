@@ -14,6 +14,7 @@ import '../models/user.dart';
 import '../models/category.dart';
 import 'item_form.dart';
 import 'category_screen.dart';
+import 'account_settings_screen.dart';
 
 class InventoryHomePage extends StatefulWidget {
   final DatabaseHelper dbHelper;
@@ -775,18 +776,20 @@ class _InventoryHomePageState extends State<InventoryHomePage>
                 _currentUser != null ? Text(_currentUser!.username) : null,
             trailing: const Icon(Icons.chevron_right),
             onTap: () {
-              // Navigate to account settings
-            },
-          ),
-        ),
-        Card(
-          child: ListTile(
-            leading: const Icon(Icons.notifications),
-            title: const Text('Notifications'),
-            subtitle: const Text('Manage notifications'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              // Navigate to notifications settings
+              if (_currentUser != null) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => AccountSettingsScreen(
+                      dbHelper: widget.dbHelper,
+                      user: _currentUser!,
+                    ),
+                  ),
+                ).then((_) {
+                  // Refresh user data when returning from account settings
+                  _loadUserAndItems();
+                });
+              }
             },
           ),
         ),
@@ -830,17 +833,6 @@ class _InventoryHomePageState extends State<InventoryHomePage>
             subtitle: const Text('Export and analyze data'),
             trailing: const Icon(Icons.chevron_right),
             onTap: _generatePdfReport,
-          ),
-        ),
-        Card(
-          child: ListTile(
-            leading: const Icon(Icons.help),
-            title: const Text('Help & Support'),
-            subtitle: const Text('Contact support and FAQ'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              // Navigate to help
-            },
           ),
         ),
         Card(
