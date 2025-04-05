@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async'; 
+import 'package:google_fonts/google_fonts.dart';
 
 import 'db/database_helper.dart';
 import 'screens/login_screen.dart';
@@ -122,22 +123,23 @@ class _MyAppState extends State<MyApp> {
     await prefs.setBool('isDarkMode', mode == ThemeMode.dark);
   }
 
-  // _toggleTheme has been moved to inventory_home.dart
-  // We'll keep a simpler version that can be called from the inventory_home
   void _toggleTheme(ThemeMode mode) async {
     _setThemeMode(mode);
   }
 
   @override
   Widget build(BuildContext context) {
-    const Color primaryColor = Color(0xFF00C291);
-    const Color secondaryColor = Color(0xFF007BFF);
-    const Color lightSurfaceColor = Color(0xFFF5F5F5);
+    const Color primaryColor = Color(0xFF2C6BED); // Modern blue
+    const Color secondaryColor = Color(0xFF38B28C); // Fresh teal
+    const Color lightSurfaceColor = Color(0xFFF8F9FA);
     const Color darkSurfaceColor = Color(0xFF121212);
+    
+    final textTheme = GoogleFonts.montserratTextTheme();
     
     return MaterialApp(
       title: 'Inventory Management',
       theme: ThemeData(
+        useMaterial3: true,
         colorScheme: ColorScheme.light(
           primary: primaryColor,
           secondary: secondaryColor,
@@ -146,31 +148,50 @@ class _MyAppState extends State<MyApp> {
           onSecondary: Colors.white,
           onSurface: Colors.black87,
         ),
+        textTheme: textTheme,
         scaffoldBackgroundColor: lightSurfaceColor,
-        appBarTheme: const AppBarTheme(
+        appBarTheme: AppBarTheme(
           backgroundColor: primaryColor,
           foregroundColor: Colors.white,
-        ),
-        tabBarTheme: const TabBarTheme(
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          indicator: UnderlineTabIndicator(
-            borderSide: BorderSide(color: Colors.white, width: 2.0),
+          elevation: 0,
+          titleTextStyle: GoogleFonts.montserrat(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
           ),
+        ),
+        cardTheme: CardTheme(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          elevation: 2,
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ButtonStyle(
             backgroundColor: MaterialStateProperty.all<Color>(primaryColor),
             foregroundColor: MaterialStateProperty.all<Color>(Colors.white),
+            shape: MaterialStateProperty.all<RoundedRectangleBorder>(
+              RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            padding: MaterialStateProperty.all<EdgeInsets>(
+              const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+            ),
           ),
         ),
-        datePickerTheme: DatePickerThemeData(
-          backgroundColor: Colors.white,
-          headerBackgroundColor: primaryColor,
-          headerForegroundColor: Colors.white,
+        inputDecorationTheme: InputDecorationTheme(
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+          filled: true,
+          fillColor: Colors.grey.shade100,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         ),
       ),
       darkTheme: ThemeData.dark().copyWith(
+        useMaterial3: true,
         colorScheme: ColorScheme.dark(
           primary: primaryColor,
           secondary: secondaryColor,
@@ -179,41 +200,35 @@ class _MyAppState extends State<MyApp> {
           onSecondary: Colors.white,
           onSurface: Colors.white,
         ),
+        textTheme: textTheme.apply(
+          bodyColor: Colors.white,
+          displayColor: Colors.white,
+        ),
         scaffoldBackgroundColor: darkSurfaceColor,
-        appBarTheme: const AppBarTheme(
+        cardTheme: CardTheme(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          elevation: 2,
+        ),
+        appBarTheme: AppBarTheme(
           backgroundColor: primaryColor,
           foregroundColor: Colors.white,
-        ),
-        tabBarTheme: const TabBarTheme(
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          indicator: UnderlineTabIndicator(
-            borderSide: BorderSide(color: Colors.white, width: 2.0),
+          elevation: 0,
+          titleTextStyle: GoogleFonts.montserrat(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
           ),
         ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ButtonStyle(
-            backgroundColor: MaterialStateProperty.all<Color>(primaryColor),
-            foregroundColor: MaterialStateProperty.all<Color>(Colors.white),
+        inputDecorationTheme: InputDecorationTheme(
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
           ),
-        ),
-        datePickerTheme: DatePickerThemeData(
-          backgroundColor: darkSurfaceColor,
-          headerBackgroundColor: primaryColor,
-          headerForegroundColor: Colors.white,
-          surfaceTintColor: Colors.transparent,
-          dayBackgroundColor: MaterialStateColor.resolveWith((states) => 
-            states.contains(MaterialState.selected) ? primaryColor : Colors.transparent
-          ),
-          dayForegroundColor: MaterialStateColor.resolveWith((states) => 
-            states.contains(MaterialState.selected) ? Colors.white : Colors.white
-          ),
-          todayBackgroundColor: MaterialStateColor.resolveWith((states) => 
-            states.contains(MaterialState.selected) ? primaryColor : Colors.transparent
-          ),
-          todayForegroundColor: MaterialStateColor.resolveWith((states) => 
-            states.contains(MaterialState.selected) ? Colors.white : primaryColor
-          ),
+          filled: true,
+          fillColor: Colors.grey.shade800,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         ),
       ),
       themeMode: _themeMode,

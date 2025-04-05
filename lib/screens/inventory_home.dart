@@ -1,12 +1,19 @@
 // inventory_home.dart
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:intl/intl.dart'; // Fixed import for DateFormat
+import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:io';
+
+// New imports for UI modernization
+import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
+import 'package:lottie/lottie.dart';
+import 'package:animations/animations.dart';
 
 import '../db/database_helper.dart';
 import '../models/item.dart';
@@ -19,7 +26,7 @@ import 'sales_report_screen.dart';
 
 class InventoryHomePage extends StatefulWidget {
   final DatabaseHelper dbHelper;
-  final Function(ThemeMode) toggleTheme; // Update function signature
+  final Function(ThemeMode) toggleTheme;
   final bool isDarkMode;
   final ThemeMode themeMode;
 
@@ -44,21 +51,32 @@ class _InventoryHomePageState extends State<InventoryHomePage>
   String _searchQuery = '';
   int? _selectedCategoryId;
   List<Category> _categories = [];
-  final FocusNode _searchFocusNode = FocusNode(); // Add this line
+  final FocusNode _searchFocusNode = FocusNode();
   final TextEditingController _searchController = TextEditingController();
+
+  // Animation controllers
+  final List<bool> _animatedItems = [];
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(_handleTabChange);
     _loadUserAndItems();
+  }
+
+  void _handleTabChange() {
+    if (_tabController.indexIsChanging) {
+      setState(() {});
+    }
   }
 
   @override
   void dispose() {
+    _tabController.removeListener(_handleTabChange);
     _tabController.dispose();
     _searchController.dispose();
-    _searchFocusNode.dispose(); // Add this line
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -583,395 +601,742 @@ class _InventoryHomePageState extends State<InventoryHomePage>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
+    Theme.of(context);
+    
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Inventory Management'),
+        elevation: 0,
+        title: Text(
+          'Inventory Management',
+          style: GoogleFonts.montserrat(
+            fontWeight: FontWeight.w600,
+          ),
+        ).animate().fadeIn(duration: 600.ms),
         actions: [
           IconButton(
             icon: const Icon(Icons.account_circle),
             onPressed: () {
-              showDialog(
-                context: context,
-                builder:
-                    (ctx) => AlertDialog(
-                      title: const Text('User Profile'),
-                      content:
-                          _currentUser == null
-                              ? const Text('Loading user data...')
-                              : Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('Username: ${_currentUser!.username}'),
-                                  Text('Email: ${_currentUser!.email}'),
-                                  Text(
-                                    'Joined: ${DateFormat('yyyy-MM-dd').format(DateTime.parse(_currentUser!.createdAt))}',
-                                  ),
-                                ],
-                              ),
-                      actions: [
-                        TextButton(
-                          onPressed: () {
-                            Navigator.of(ctx).pop();
-                          },
-                          child: const Text('Close'),
-                        ),
-                        TextButton(
-                          onPressed: _logout,
-                          child: const Text('Logout'),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            Navigator.of(ctx).pop();
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => AccountSettingsScreen(
-                                  dbHelper: widget.dbHelper,
-                                  user: _currentUser!,
-                                ),
-                              ),
-                            ).then((_) {
-                              // Refresh user data when returning from account settings
-                              _loadUserAndItems();
-                            });
-                          },
-                          child: const Text("Settings")
-                        )
-                      ],
-                    ),
-              );
+              _showUserProfileModal();
             },
-          ),
+          ).animate().scale(delay: 200.ms),
           IconButton(
             icon: const Icon(Icons.picture_as_pdf),
             onPressed: _generatePdfReport,
+          ).animate().scale(delay: 300.ms),
+        ],
+      ),
+      body: _isLoading
+          ? _buildLoadingState()
+          : IndexedStack(
+              index: _tabController.index,
+              children: [
+                _buildItemsTab().animate().fadeIn(duration: 400.ms),
+                _buildDashboardTab().animate().fadeIn(duration: 400.ms),
+                _buildSettingsTab().animate().fadeIn(duration: 400.ms),
+              ],
+            ),
+      floatingActionButton: _buildFloatingActionButton(),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _tabController.index,
+        onTap: (index) {
+          setState(() {
+            _tabController.index = index;
+          });
+        },
+        selectedItemColor: Theme.of(context).colorScheme.primary,
+        unselectedItemColor: Colors.grey,
+        selectedLabelStyle: GoogleFonts.montserrat(
+          fontWeight: FontWeight.w600,
+          fontSize: 13,
+        ),
+        unselectedLabelStyle: GoogleFonts.montserrat(
+          fontWeight: FontWeight.w500,
+          fontSize: 12,
+        ),
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.list),
+            label: 'Inventory',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.analytics),
+            label: 'Analytics',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.settings),
+            label: 'Settings',
           ),
         ],
       ),
-      body:
-          _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : TabBarView(
-                controller: _tabController,
+    );
+  }
+  
+  Widget _buildLoadingState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Lottie.network(
+            'https://assets10.lottiefiles.com/packages/lf20_usmfx6bp.json',
+            width: 200,
+            height: 200,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Loading your inventory...',
+            style: GoogleFonts.montserrat(fontSize: 16),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFloatingActionButton() {
+    if (_tabController.index != 0) return const SizedBox.shrink();
+    
+    return OpenContainer(
+      transitionDuration: const Duration(milliseconds: 500),
+      transitionType: ContainerTransitionType.fadeThrough,
+      openBuilder: (context, _) => ItemFormScreen(
+        dbHelper: widget.dbHelper,
+        userId: _currentUser!.id!,
+        onItemSaved: () {
+          _loadItems();
+        },
+      ),
+      closedElevation: 6.0,
+      closedShape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.all(Radius.circular(16)),
+      ),
+      closedColor: Theme.of(context).colorScheme.primary,
+      closedBuilder: (context, openContainer) {
+        return SizedBox(
+          height: 56,
+          width: 56,
+          child: Center(
+            child: Icon(
+              Icons.add,
+              color: Theme.of(context).colorScheme.onPrimary,
+            ),
+          ),
+        );
+      },
+    ).animate().scale(delay: 400.ms);
+  }
+
+  void _showUserProfileModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
-                  _buildItemsTab(),
-                  _buildDashboardTab(),
-                  _buildSettingsTab(),
+                  Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Text(
+                        _currentUser?.username.substring(0, 1).toUpperCase() ?? 'U',
+                        style: GoogleFonts.montserrat(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _currentUser?.username ?? 'User',
+                          style: GoogleFonts.montserrat(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          _currentUser?.email ?? 'Email not available',
+                          style: GoogleFonts.montserrat(
+                            fontSize: 14,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
+              ).animate().fadeIn().slide(begin: const Offset(0, 0.5)),
+              const SizedBox(height: 24),
+              _buildProfileOption(
+                icon: Icons.settings,
+                title: 'Account Settings',
+                onTap: () {
+                  Navigator.pop(context);
+                  if (_currentUser != null) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => AccountSettingsScreen(
+                          dbHelper: widget.dbHelper,
+                          user: _currentUser!,
+                        ),
+                      ),
+                    ).then((_) {
+                      _loadUserAndItems();
+                    });
+                  }
+                },
               ),
-      bottomNavigationBar: Material(
-        color: theme.primaryColor,
-        child: TabBar(
-          controller: _tabController,
-          indicatorColor: Colors.white,
-          indicatorSize: TabBarIndicatorSize.label, // Add this to make indicator only appear under the label
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          tabs: const [
-            Tab(icon: Icon(Icons.list), text: 'Items'),
-            Tab(icon: Icon(Icons.analytics), text: 'Dashboard'),
-            Tab(icon: Icon(Icons.settings), text: 'Settings'),
+              _buildProfileOption(
+                icon: Icons.logout,
+                title: 'Logout',
+                onTap: () {
+                  Navigator.pop(context);
+                  _showLogoutConfirmation();
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildProfileOption({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
+            const SizedBox(width: 12),
+            Text(
+              title,
+              style: GoogleFonts.montserrat(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ],
         ),
       ),
-      floatingActionButton:
-          _tabController.index == 0
-              ? FloatingActionButton(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder:
-                          (context) => ItemFormScreen(
-                            dbHelper: widget.dbHelper,
-                            userId: _currentUser!.id!,
-                            onItemSaved: () {
-                              _loadItems();
-                            },
-                          ),
-                    ),
-                  );
-                },
-                backgroundColor: theme.colorScheme.primary,
-                foregroundColor: theme.colorScheme.onPrimary,
-                child: const Icon(Icons.add),
-              )
-              : null,
+    ).animate().fadeIn(delay: 200.ms).slide(begin: const Offset(0, 0.3));
+  }
+
+  void _showLogoutConfirmation() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Logout Confirmation',
+          style: GoogleFonts.montserrat(fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          'Are you sure you want to logout from your account?',
+          style: GoogleFonts.montserrat(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.montserrat(),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _logout();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: Text(
+              'Logout',
+              style: GoogleFonts.montserrat(),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildItemsTab() {
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _searchController,
-                  focusNode: _searchFocusNode, // Add this line
-                  textInputAction: TextInputAction.search, // Add this line
-                  onSubmitted: (value) { // Add this handler
-                    // This will run when the search/done button is pressed
-                    _searchFocusNode.unfocus();
-                    setState(() {
-                      _searchQuery = value;
-                    });
-                    _loadItems();
-                  },
-                  decoration: InputDecoration(
-                    hintText: 'Search items...',
-                    prefixIcon: const Icon(Icons.search),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    suffixIcon:
-                        _searchQuery.isNotEmpty
-                            ? IconButton(
-                              icon: const Icon(Icons.clear),
-                              onPressed: () {
-                                _searchController.clear();
-                                setState(() {
-                                  _searchQuery = '';
-                                });
-                                _loadItems();
-                              },
-                            )
-                            : null,
-                  ),
-                  onChanged: (value) {
-                    setState(() {
-                      _searchQuery = value;
-                    });
-                    _loadItems();
-                  },
-                ),
-              ),
-              const SizedBox(width: 8),
-              DropdownButton<int?>(
-                hint: const Text('Category'),
-                value: _selectedCategoryId,
-                onChanged: (value) {
-                  setState(() {
-                    _selectedCategoryId = value;
-                  });
-                  _loadItems();
-                },
-                items: [
-                  const DropdownMenuItem<int?>(
-                    value: null,
-                    child: Text('All Categories'),
-                  ),
-                  ..._categories.map((category) {
-                    return DropdownMenuItem<int>(
-                      value: category.id,
-                      child: Text(category.name),
-                    );
-                  }),
-                ],
-              ),
-              IconButton(
-                icon: const Icon(Icons.category),
-                tooltip: 'Manage Categories',
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder:
-                          (context) =>
-                              CategoryScreen(dbHelper: widget.dbHelper),
-                    ),
-                  ).then((_) {
-                    _loadCategories();
-                    _loadItems();
-                  });
-                },
-              ),
-            ],
-          ),
-        ),
+        _buildSearchBar(),
         Expanded(
-          child:
-              _items.isEmpty
-                  ? const Center(
-                    child: Text(
-                      'No items found',
-                      style: TextStyle(fontSize: 18),
-                    ),
-                  )
-                  : RefreshIndicator(
-                      onRefresh: () async {
-                        // Reload data when the user pulls down
-                        await _loadCategories();
-                        await _loadItems();
-                      },
-                      child: ListView.builder(
-                        itemCount: _items.length,
-                        itemBuilder: (context, index) {
-                          final item = _items[index];
-
-                          // Find the category color if available
-                          Color itemColor = Colors.blue.shade100;
-                          if (item.categoryId != null) {
-                            final category = _categories.firstWhere(
-                              (c) => c.id == item.categoryId,
-                              orElse: () => Category(name: 'Unknown'),
-                            );
-
-                            if (category.color != null) {
-                              // Convert hex color string to Color
-                              itemColor = Color(
-                                int.parse(category.color!.replaceAll('#', '0xFF')),
-                              );
-                            }
-                          }
-
-                          return Dismissible(
-                            key: Key(item.id.toString()),
-                            background: Container(
-                              color: Colors.red,
-                              alignment: Alignment.centerRight,
-                              padding: const EdgeInsets.symmetric(horizontal: 20),
-                              child: const Icon(Icons.delete, color: Colors.white),
-                            ),
-                            direction: DismissDirection.endToStart,
-                            confirmDismiss: (direction) async {
-                              return await showDialog(
-                                context: context,
-                                builder:
-                                    (context) => AlertDialog(
-                                      title: const Text('Confirm Delete'),
-                                      content: Text(
-                                        'Are you sure you want to delete ${item.name}?',
-                                      ),
-                                      actions: [
-                                        TextButton(
-                                          onPressed:
-                                              () =>
-                                                  Navigator.of(context).pop(false),
-                                          child: const Text('Cancel'),
-                                        ),
-                                        TextButton(
-                                          onPressed:
-                                              () => Navigator.of(context).pop(true),
-                                          child: const Text('Delete'),
-                                        ),
-                                      ],
-                                    ),
-                              );
-                            },
-                            onDismissed: (direction) async {
-                              await widget.dbHelper.deleteItem(item.id!);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('${item.name} deleted')),
-                              );
-                              _loadItems();
-                            },
-                            child: Card(
-                              margin: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              child: ListTile(
-                                leading: CircleAvatar(
-                                  backgroundColor: itemColor,
-                                  child: Text(
-                                    item.name.substring(0, 1).toUpperCase(),
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                title: Text(item.name),
-                                subtitle: Text(
-                                  'Category: ${_getCategoryName(item.categoryId) ?? 'N/A'}',
-                                ),
-                                trailing: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text(
-                                      '\$${item.price.toStringAsFixed(2)}',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    Text('Qty: ${item.quantity}'),
-                                  ],
-                                ),
-                                onTap: () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder:
-                                          (context) => ItemFormScreen(
-                                            dbHelper: widget.dbHelper,
-                                            userId: _currentUser!.id!,
-                                            item: item,
-                                            onItemSaved: () {
-                                              _loadItems();
-                                            },
-                                          ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
+          child: _items.isEmpty
+              ? _buildEmptyState()
+              : _buildItemsList(),
         ),
       ],
     );
   }
 
-  Widget _buildDashboardTab() {
+  Widget _buildSearchBar() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          TextField(
+            controller: _searchController,
+            focusNode: _searchFocusNode,
+            textInputAction: TextInputAction.search,
+            onSubmitted: (value) {
+              _searchFocusNode.unfocus();
+              setState(() {
+                _searchQuery = value;
+              });
+              _loadItems();
+            },
+            decoration: InputDecoration(
+              hintText: 'Search inventory...',
+              prefixIcon: const Icon(Icons.search),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide.none,
+              ),
+              filled: true,
+              fillColor: Theme.of(context).brightness == Brightness.light
+                  ? Colors.grey.shade100
+                  : Colors.grey.shade800,
+              contentPadding: const EdgeInsets.symmetric(vertical: 12),
+              suffixIcon: _searchQuery.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() {
+                          _searchQuery = '';
+                        });
+                        _loadItems();
+                      },
+                    )
+                  : null,
+            ),
+            style: GoogleFonts.montserrat(),
+          ).animate().fadeIn(duration: 300.ms),
+          const SizedBox(height: 12),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                FilterChip(
+                  label: Text(
+                    'All Categories',
+                    style: GoogleFonts.montserrat(
+                      fontSize: 12,
+                      fontWeight: _selectedCategoryId == null ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
+                  selected: _selectedCategoryId == null,
+                  onSelected: (selected) {
+                    setState(() {
+                      _selectedCategoryId = null;
+                    });
+                    _loadItems();
+                  },
+                  backgroundColor: Theme.of(context).cardColor,
+                  selectedColor: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                  checkmarkColor: Theme.of(context).colorScheme.primary,
+                ).animate().fadeIn(delay: 100.ms).slide(begin: const Offset(0, 0.5)),
+                const SizedBox(width: 8),
+                ..._categories.map((category) {
+                  final categoryColor = category.color != null
+                      ? Color(int.parse(category.color!.replaceAll('#', '0xFF')))
+                      : Theme.of(context).colorScheme.primary;
+                  
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: FilterChip(
+                      label: Text(
+                        category.name,
+                        style: GoogleFonts.montserrat(
+                          fontSize: 12,
+                          fontWeight: _selectedCategoryId == category.id ? FontWeight.bold : FontWeight.normal,
+                        ),
+                      ),
+                      selected: _selectedCategoryId == category.id,
+                      onSelected: (selected) {
+                        setState(() {
+                          _selectedCategoryId = selected ? category.id : null;
+                        });
+                        _loadItems();
+                      },
+                      backgroundColor: Theme.of(context).cardColor,
+                      selectedColor: categoryColor.withOpacity(0.2),
+                      checkmarkColor: categoryColor,
+                    ).animate().fadeIn(delay: 100.ms * (_categories.indexOf(category) + 1)).slide(begin: const Offset(0, 0.5)),
+                  );
+                }),
+                const SizedBox(width: 8),
+                ActionChip(
+                  label: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.edit, size: 16),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Manage',
+                        style: GoogleFonts.montserrat(fontSize: 12),
+                      ),
+                    ],
+                  ),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => CategoryScreen(dbHelper: widget.dbHelper),
+                      ),
+                    ).then((_) {
+                      _loadCategories();
+                      _loadItems();
+                    });
+                  },
+                  backgroundColor: Theme.of(context).brightness == Brightness.light
+                      ? Colors.grey.shade200
+                      : Colors.grey.shade800,
+                ).animate().fadeIn(delay: 100.ms * (_categories.length + 1)).slide(begin: const Offset(0, 0.5)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Lottie.network(
+            'https://assets2.lottiefiles.com/packages/lf20_qm8403ke.json',
+            width: 200,
+            height: 200,
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'No items found',
+            style: GoogleFonts.montserrat(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _searchQuery.isNotEmpty || _selectedCategoryId != null
+                ? 'Try changing your search or filter'
+                : 'Start by adding your first inventory item',
+            style: GoogleFonts.montserrat(
+              fontSize: 14,
+              color: Colors.grey,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          if (_searchQuery.isEmpty && _selectedCategoryId == null)
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => ItemFormScreen(
+                      dbHelper: widget.dbHelper,
+                      userId: _currentUser!.id!,
+                      onItemSaved: () {
+                        _loadItems();
+                      },
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.add),
+              label: Text(
+                'Add Item',
+                style: GoogleFonts.montserrat(),
+              ),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildItemsList() {
+    // Ensure all items have animation state
+    while (_animatedItems.length < _items.length) {
+      _animatedItems.add(false);
+    }
+    
     return RefreshIndicator(
       onRefresh: () async {
-        // Reload data when the user pulls down
         await _loadCategories();
         await _loadItems();
       },
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(), // Important for RefreshIndicator to work with SingleChildScrollView
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Card(
+      child: ListView.builder(
+        padding: const EdgeInsets.only(bottom: 80),
+        itemCount: _items.length,
+        itemBuilder: (context, index) {
+          // Trigger animation after a delay based on index
+          Future.delayed(Duration(milliseconds: 50 * index), () {
+            if (mounted && index < _animatedItems.length) {
+              setState(() {
+                _animatedItems[index] = true;
+              });
+            }
+          });
+          
+          return _buildItemCard(index);
+        },
+      ),
+    );
+  }
+
+  Widget _buildItemCard(int index) {
+    final item = _items[index];
+    final isAnimated = index < _animatedItems.length ? _animatedItems[index] : false;
+    
+    // Find the category color if available
+    Color itemColor = Theme.of(context).colorScheme.primary;
+    if (item.categoryId != null) {
+      final category = _categories.firstWhere(
+        (c) => c.id == item.categoryId,
+        orElse: () => Category(name: 'Unknown'),
+      );
+
+      if (category.color != null) {
+        // Convert hex color string to Color
+        itemColor = Color(
+          int.parse(category.color!.replaceAll('#', '0xFF')),
+        );
+      }
+    }
+
+    return Dismissible(
+      key: Key(item.id.toString()),
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        decoration: BoxDecoration(
+          color: Colors.red.shade400,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: const Icon(Icons.delete, color: Colors.white),
+      ),
+      direction: DismissDirection.endToStart,
+      confirmDismiss: (direction) async {
+        return await showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Text(
+              'Confirm Delete',
+              style: GoogleFonts.montserrat(fontWeight: FontWeight.bold),
+            ),
+            content: Text(
+              'Are you sure you want to delete ${item.name}?',
+              style: GoogleFonts.montserrat(),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: Text(
+                  'Cancel',
+                  style: GoogleFonts.montserrat(),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                ),
+                child: Text(
+                  'Delete',
+                  style: GoogleFonts.montserrat(),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+      onDismissed: (direction) async {
+        await widget.dbHelper.deleteItem(item.id!);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${item.name} deleted',
+              style: GoogleFonts.montserrat(),
+            ),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            action: SnackBarAction(
+              label: 'UNDO',
+              onPressed: () {
+                // You would need to implement an undo feature here
+                _loadItems();
+              },
+            ),
+          ),
+        );
+        _loadItems();
+      },
+      child: OpenContainer(
+        transitionDuration: const Duration(milliseconds: 500),
+        openBuilder: (context, _) => ItemFormScreen(
+          dbHelper: widget.dbHelper,
+          userId: _currentUser!.id!,
+          item: item,
+          onItemSaved: () {
+            _loadItems();
+          },
+        ),
+        closedElevation: 0,
+        closedShape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        closedColor: Colors.transparent,
+        closedBuilder: (context, openContainer) {
+          return Card(
+            margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: InkWell(
+              onTap: openContainer,
+              borderRadius: BorderRadius.circular(16),
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
                   children: [
-                    const Text(
-                      'Inventory Summary',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    // Category color indicator and item initial
+                    Container(
+                      width: 50,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        color: itemColor.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Center(
+                        child: Text(
+                          item.name.substring(0, 1).toUpperCase(),
+                          style: GoogleFonts.montserrat(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: itemColor,
+                          ),
+                        ),
+                      ),
                     ),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    const SizedBox(width: 16),
+                    // Item details
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.name,
+                            style: GoogleFonts.montserrat(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _getCategoryName(item.categoryId) ?? 'Uncategorized',
+                            style: GoogleFonts.montserrat(
+                              fontSize: 12,
+                              color: Colors.grey,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              _buildItemAttribute(
+                                icon: Icons.inventory_2_outlined,
+                                value: item.quantity.toString(),
+                                color: _getQuantityColor(item.quantity),
+                              ),
+                              const SizedBox(width: 16),
+                              _buildItemAttribute(
+                                icon: Icons.attach_money,
+                                value: '\$${item.price.toStringAsFixed(2)}',
+                                color: Colors.green,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Total value
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        _buildSummaryCard(
-                          title: 'Total Items',
-                          value: _items.length.toString(),
-                          icon: Icons.inventory_2,
-                          color: Colors.blue,
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).brightness == Brightness.light
+                                ? Colors.grey.shade100
+                                : Colors.grey.shade800,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            '\$${(item.price * item.quantity).toStringAsFixed(2)}',
+                            style: GoogleFonts.montserrat(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
                         ),
-                        _buildSummaryCard(
-                          title: 'Categories',
-                          value: _categories.length.toString(),
-                          icon: Icons.category,
-                          color: Colors.green,
-                        ),
-                        _buildSummaryCard(
-                          title: 'Total Value',
-                          value: '\$${_calculateTotalValue().toStringAsFixed(2)}',
-                          icon: Icons.attach_money,
-                          color: Colors.amber,
+                        const SizedBox(height: 4),
+                        Text(
+                          'total value',
+                          style: GoogleFonts.montserrat(
+                            fontSize: 10,
+                            color: Colors.grey,
+                          ),
                         ),
                       ],
                     ),
@@ -979,99 +1344,392 @@ class _InventoryHomePageState extends State<InventoryHomePage>
                 ),
               ),
             ),
+          ).animate(target: isAnimated ? 1 : 0)
+            .fade(duration: 400.ms)
+            .slide(begin: const Offset(0.5, 0), duration: 400.ms);
+        },
+      ),
+    );
+  }
+
+  Widget _buildItemAttribute({
+    required IconData icon,
+    required String value,
+    required Color color,
+  }) {
+    return Row(
+      children: [
+        Icon(icon, size: 12, color: color),
+        const SizedBox(width: 4),
+        Text(
+          value,
+          style: GoogleFonts.montserrat(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: color,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Color _getQuantityColor(int quantity) {
+    if (quantity <= 5) return Colors.red;
+    if (quantity <= 10) return Colors.orange;
+    return Colors.green;
+  }
+
+  Widget _buildDashboardTab() {
+    return RefreshIndicator(
+      onRefresh: () async {
+        await _loadCategories();
+        await _loadItems();
+      },
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildInventorySummaryCard(),
             const SizedBox(height: 20),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Low Stock Items',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 16),
-                    SizedBox(height: 200, child: _buildLowStockList()),
-                  ],
-                ),
-              ),
-            ),
+            _buildLowStockCard(),
             const SizedBox(height: 20),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Inventory by Category',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 16),
-                    SizedBox(height: 300, child: _buildCategoryChart()),
-                  ],
-                ),
-              ),
-            ),
+            _buildCategoryChartCard(),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSummaryCard({
+  Widget _buildInventorySummaryCard() {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Inventory Summary',
+                  style: GoogleFonts.montserrat(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    DateFormat('MMM d, yyyy').format(DateTime.now()),
+                    style: GoogleFonts.montserrat(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ),
+              ],
+            ).animate().fadeIn().slideY(begin: -0.2, duration: 400.ms),
+            const SizedBox(height: 24),
+            StaggeredGrid.count(
+              crossAxisCount: 2,
+              mainAxisSpacing: 16,
+              crossAxisSpacing: 16,
+              children: [
+                StaggeredGridTile.fit(
+                  crossAxisCellCount: 1,
+                  child: _buildSummaryTile(
+                    title: 'Total Items',
+                    value: _items.length.toString(),
+                    icon: Icons.inventory_2,
+                    color: Colors.blue,
+                    delay: 0,
+                  ),
+                ),
+                StaggeredGridTile.fit(
+                  crossAxisCellCount: 1,
+                  child: _buildSummaryTile(
+                    title: 'Categories',
+                    value: _categories.length.toString(),
+                    icon: Icons.category,
+                    color: Colors.green,
+                    delay: 100,
+                  ),
+                ),
+                StaggeredGridTile.fit(
+                  crossAxisCellCount: 2,
+                  child: _buildSummaryTile(
+                    title: 'Total Value',
+                    value: '\$${_calculateTotalValue().toStringAsFixed(2)}',
+                    icon: Icons.attach_money,
+                    color: Colors.amber,
+                    isWide: true,
+                    delay: 200,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ).animate().fadeIn().slideY(begin: 0.3, duration: 400.ms);
+  }
+
+  Widget _buildSummaryTile({
     required String title,
-    required String value,
+    required String value, 
     required IconData icon,
     required Color color,
+    bool isWide = false,
+    required int delay,
   }) {
-    return SizedBox(
-      width: 100,
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 40, color: color),
-          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: color, size: 20),
+              ),
+              if (!isWide)
+                Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  child: Center(
+                    child: Icon(
+                      Icons.arrow_forward_ios,
+                      color: color,
+                      size: 12,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
           Text(
             value,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            style: GoogleFonts.montserrat(
+              fontSize: isWide ? 28 : 22,
+              fontWeight: FontWeight.bold,
+            ),
           ),
+          const SizedBox(height: 4),
           Text(
             title,
-            style: TextStyle(color: Colors.grey.shade600),
-            textAlign: TextAlign.center,
+            style: GoogleFonts.montserrat(
+              fontSize: 14,
+              color: Colors.grey,
+            ),
           ),
         ],
       ),
-    );
+    ).animate().fadeIn(delay: Duration(milliseconds: delay)).slide(delay: Duration(milliseconds: delay));
   }
 
-  Widget _buildLowStockList() {
+  Widget _buildLowStockCard() {
     final lowStockItems = _items.where((item) => item.quantity < 10).toList();
 
-    if (lowStockItems.isEmpty) {
-      return const Center(child: Text('No low stock items'));
-    }
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Low Stock Items',
+                  style: GoogleFonts.montserrat(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '${lowStockItems.length} items',
+                    style: GoogleFonts.montserrat(
+                      fontSize: 12,
+                      color: Colors.red,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            lowStockItems.isEmpty
+                ? _buildEmptyLowStockState()
+                : SizedBox(
+                    height: 200,
+                    child: ListView.builder(
+                      itemCount: lowStockItems.length,
+                      itemBuilder: (context, index) {
+                        final item = lowStockItems[index];
+                        return InkWell(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ItemFormScreen(
+                                  dbHelper: widget.dbHelper,
+                                  userId: _currentUser!.id!,
+                                  item: item,
+                                  onItemSaved: () {
+                                    _loadItems();
+                                  },
+                                ),
+                              ),
+                            );
+                          },
+                          borderRadius: BorderRadius.circular(12),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 36,
+                                  height: 36,
+                                  decoration: BoxDecoration(
+                                    color: _getQuantityColor(item.quantity).withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      item.quantity.toString(),
+                                      style: GoogleFonts.montserrat(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: _getQuantityColor(item.quantity),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        item.name,
+                                        style: GoogleFonts.montserrat(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      Text(
+                                        _getCategoryName(item.categoryId) ?? 'Uncategorized',
+                                        style: GoogleFonts.montserrat(
+                                          fontSize: 12,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Text(
+                                  '\$${item.price.toStringAsFixed(2)}',
+                                  style: GoogleFonts.montserrat(
+                                    fontSize: 14,
+                                    color: Colors.green,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ).animate().fadeIn(delay: Duration(milliseconds: 100 * index)).slideX(delay: Duration(milliseconds: 100 * index));
+                      },
+                    ),
+                  ),
+          ],
+        ),
+      ),
+    ).animate().fadeIn(delay: 100.ms).slideY(begin: 0.3, duration: 400.ms);
+  }
 
-    return ListView.builder(
-      itemCount: lowStockItems.length,
-      itemBuilder: (context, index) {
-        final item = lowStockItems[index];
-        return ListTile(
-          leading: CircleAvatar(
-            backgroundColor: Colors.red.shade100,
-            child: Text(
-              item.quantity.toString(),
-              style: const TextStyle(color: Colors.red),
+  double _calculateTotalValue() {
+    return _items.fold(0.0, (sum, item) => sum + (item.price * item.quantity));
+  }
+
+  Widget _buildEmptyLowStockState() {
+    return Container(
+      height: 150,
+      alignment: Alignment.center,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.check_circle_outline,
+            size: 48,
+            color: Colors.green.shade300,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'All items are well stocked',
+            style: GoogleFonts.montserrat(
+              fontSize: 14,
+              color: Colors.grey,
             ),
           ),
-          title: Text(item.name),
-          subtitle: Text(
-            'Category: ${_getCategoryName(item.categoryId) ?? 'N/A'}',
-          ),
-          trailing: Text('\$${item.price.toStringAsFixed(2)}'),
-        );
-      },
-    );
+        ],
+      ),
+    ).animate().fadeIn(delay: 200.ms);
+  }
+
+  Widget _buildCategoryChartCard() {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Inventory by Category',
+              style: GoogleFonts.montserrat(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 300,
+              child: _buildCategoryChart(),
+            ),
+          ],
+        ),
+      ),
+    ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.3, duration: 400.ms);
   }
 
   Widget _buildCategoryChart() {
@@ -1081,7 +1739,7 @@ class _InventoryHomePageState extends State<InventoryHomePage>
 
     for (final item in _items) {
       String categoryName;
-      Color categoryColor = Colors.blue; // Default color
+      Color categoryColor = Theme.of(context).colorScheme.primary; // Default color
 
       if (item.categoryId != null) {
         // Find the category
@@ -1114,14 +1772,41 @@ class _InventoryHomePageState extends State<InventoryHomePage>
 
     // No data case
     if (categoryMap.isEmpty) {
-      return const Center(child: Text('No data to display'));
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.pie_chart_outline,
+              size: 48,
+              color: Colors.grey.shade400,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No category data to display',
+              style: GoogleFonts.montserrat(
+                fontSize: 14,
+                color: Colors.grey,
+              ),
+            ),
+          ],
+        ),
+      ).animate().fadeIn(delay: 300.ms);
     }
 
     // Convert map to list of sections
     final sections = <PieChartSectionData>[];
+    int index = 0;
 
     categoryMap.forEach((category, value) {
-      final color = categoryColorMap[category] ?? Colors.blue;
+      final color = categoryColorMap[category] ?? Theme.of(context).colorScheme.primary;
+      
+      // Use a delay based on index for animation
+      Future.delayed(Duration(milliseconds: 100 * index), () {
+        if (mounted) {
+          setState(() {});
+        }
+      });
 
       sections.add(
         PieChartSectionData(
@@ -1129,143 +1814,234 @@ class _InventoryHomePageState extends State<InventoryHomePage>
           value: value,
           title: '$category\n\$${value.toStringAsFixed(0)}',
           radius: 100,
-          titleStyle: const TextStyle(
-            fontSize: 14,
+          titleStyle: GoogleFonts.montserrat(
+            fontSize: 12,
             fontWeight: FontWeight.bold,
             color: Colors.white,
           ),
+          badgeWidget: _BadgeIcon(
+            color: color,
+            iconData: Icons.circle,
+          ),
+          badgePositionPercentageOffset: 1.2,
         ),
       );
+      index++;
     });
 
     return PieChart(
-      PieChartData(sections: sections, centerSpaceRadius: 40, sectionsSpace: 2),
-    );
-  }
-
-  double _calculateTotalValue() {
-    return _items.fold(0, (sum, item) => sum + (item.price * item.quantity));
+      PieChartData(
+        sections: sections,
+        centerSpaceRadius: 40,
+        sectionsSpace: 2,
+        startDegreeOffset: -90,
+        pieTouchData: PieTouchData(
+          touchCallback: (event, response) {
+            // Handle touch interactions if needed
+          },
+        ),
+        centerSpaceColor: Colors.transparent,
+      ),
+    ).animate().fadeIn(delay: 300.ms);
   }
 
   Widget _buildSettingsTab() {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Card(
-          child: ListTile(
-            leading: const Icon(Icons.account_circle),
-            title: const Text('Account Settings'),
-            subtitle:
-                _currentUser != null ? Text(_currentUser!.username) : null,
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              if (_currentUser != null) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => AccountSettingsScreen(
-                      dbHelper: widget.dbHelper,
-                      user: _currentUser!,
-                    ),
-                  ),
-                ).then((_) {
-                  // Refresh user data when returning from account settings
-                  _loadUserAndItems();
-                });
-              }
-            },
-          ),
-        ),
-        Card(
-          child: ListTile(
-            leading: const Icon(Icons.dark_mode),
-            title: const Text('Theme Settings'),
-            subtitle: Text(_getThemeModeText()),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: _toggleTheme,
-          ),
-        ),
-        Card(
-          child: ListTile(
-            leading: const Icon(Icons.category),
-            title: const Text('Manage Categories'),
-            subtitle: const Text('Add, edit, or delete categories'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
+        _buildSettingsCard(
+          title: 'Account Settings',
+          subtitle: _currentUser != null ? _currentUser!.username : '',
+          icon: Icons.account_circle,
+          iconColor: Colors.blue,
+          onTap: () {
+            if (_currentUser != null) {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder:
-                      (context) => CategoryScreen(dbHelper: widget.dbHelper),
+                  builder: (context) => AccountSettingsScreen(
+                    dbHelper: widget.dbHelper,
+                    user: _currentUser!,
+                  ),
                 ),
               ).then((_) {
-                _loadCategories();
-                _loadItems();
+                _loadUserAndItems();
               });
-            },
-          ),
+            }
+          },
+          delay: 0,
         ),
-        Card(
-          child: ListTile(
-            leading: const Icon(Icons.bar_chart),
-            title: const Text('Reports'),
-            subtitle: const Text('Export and analyze data'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: _generatePdfReport,
-          ),
+        _buildSettingsCard(
+          title: 'Theme Settings',
+          subtitle: _getThemeModeText(),
+          icon: Icons.dark_mode,
+          iconColor: Colors.purple,
+          onTap: _toggleTheme,
+          delay: 100,
         ),
-        Card(
-          child: ListTile(
-            leading: const Icon(Icons.point_of_sale),
-            title: const Text('Sales Reports'),
-            subtitle: const Text('View and analyze sales transactions'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => SalesReportScreen(
-                    dbHelper: widget.dbHelper,
-                    userId: _currentUser!.id!,
-                  ),
+        _buildSettingsCard(
+          title: 'Manage Categories',
+          subtitle: 'Add, edit, or delete categories',
+          icon: Icons.category,
+          iconColor: Colors.green,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => CategoryScreen(dbHelper: widget.dbHelper),
+              ),
+            ).then((_) {
+              _loadCategories();
+              _loadItems();
+            });
+          },
+          delay: 200,
+        ),
+        _buildSettingsCard(
+          title: 'Reports',
+          subtitle: 'Export and analyze data',
+          icon: Icons.bar_chart,
+          iconColor: Colors.orange,
+          onTap: _generatePdfReport,
+          delay: 300,
+        ),
+        _buildSettingsCard(
+          title: 'Sales Reports',
+          subtitle: 'View and analyze sales transactions',
+          icon: Icons.point_of_sale,
+          iconColor: Colors.teal,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => SalesReportScreen(
+                  dbHelper: widget.dbHelper,
+                  userId: _currentUser!.id!,
                 ),
-              );
-            },
-          ),
+              ),
+            );
+          },
+          delay: 400,
         ),
-        Card(
-          child: ListTile(
-            leading: const Icon(Icons.info),
-            title: const Text('About'),
-            subtitle: const Text('App information'),
-            onTap: () {
-              showAboutDialog(
-                context: context,
-                applicationName: 'Inventory Management',
-                applicationVersion: '1.0.0',
-                applicationIcon: const FlutterLogo(size: 50),
-                children: [
-                  const Text(
-                    'A comprehensive inventory management application built with Flutter.',
-                  ),
-                ],
-              );
-            },
-          ),
+        _buildSettingsCard(
+          title: 'About',
+          subtitle: 'App information',
+          icon: Icons.info,
+          iconColor: Colors.amber,
+          onTap: () {
+            showAboutDialog(
+              context: context,
+              applicationName: 'Inventory Management',
+              applicationVersion: '1.0.0',
+              applicationIcon: Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.inventory,
+                  color: Colors.white,
+                  size: 30,
+                ),
+              ),
+              children: [
+                Text(
+                  'A comprehensive inventory management application built with Flutter.',
+                  style: GoogleFonts.montserrat(),
+                ),
+              ],
+            );
+          },
+          delay: 500,
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 24),
         ElevatedButton.icon(
           icon: const Icon(Icons.logout),
-          label: const Text('Logout'),
+          label: Text(
+            'Logout',
+            style: GoogleFonts.montserrat(),
+          ),
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.red,
             foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 12),
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
           ),
-          onPressed: _logout,
-        ),
+          onPressed: () {
+            _showLogoutConfirmation();
+          },
+        ).animate().fade(delay: 600.ms).scale(delay: 600.ms),
       ],
     );
+  }
+
+  Widget _buildSettingsCard({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color iconColor,
+    required VoidCallback onTap,
+    required int delay,
+  }) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: iconColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  icon,
+                  color: iconColor,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: GoogleFonts.montserrat(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    if (subtitle.isNotEmpty)
+                      Text(
+                        subtitle,
+                        style: GoogleFonts.montserrat(
+                          fontSize: 14,
+                          color: Colors.grey,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right),
+            ],
+          ),
+        ),
+      ),
+    ).animate().fadeIn(delay: Duration(milliseconds: delay)).slideX(begin: 0.3, delay: Duration(milliseconds: delay));
   }
 
   String _getThemeModeText() {
@@ -1277,5 +2053,38 @@ class _InventoryHomePageState extends State<InventoryHomePage>
       case ThemeMode.system:
         return 'System Default';
     }
+  }
+}
+
+class _BadgeIcon extends StatelessWidget {
+  final Color color;
+  final IconData iconData;
+
+  const _BadgeIcon({
+    required this.color,
+    required this.iconData,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      child: Container(
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white, width: 2),
+          boxShadow: [
+            BoxShadow(
+              blurRadius: 10,
+              spreadRadius: 2,
+              color: color.withOpacity(0.3),
+            ),
+          ],
+        ),
+        width: 20,
+        height: 20,
+      ),
+    );
   }
 }

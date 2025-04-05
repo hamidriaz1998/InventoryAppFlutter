@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../db/database_helper.dart';
 import '../models/user.dart';
 
@@ -191,20 +193,33 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> with Sing
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Account Settings'),
+        title: Text(
+          'Account Settings',
+          style: GoogleFonts.montserrat(fontWeight: FontWeight.w600),
+        ),
+        elevation: 0,
         bottom: TabBar(
           controller: _tabController,
+          indicatorWeight: 3,
+          labelStyle: GoogleFonts.montserrat(
+            fontWeight: FontWeight.w600,
+            fontSize: 14,
+          ),
+          unselectedLabelStyle: GoogleFonts.montserrat(
+            fontWeight: FontWeight.w500,
+            fontSize: 14,
+          ),
           tabs: const [
-            Tab(text: 'Profile', icon: Icon(Icons.person)),
-            Tab(text: 'Password', icon: Icon(Icons.lock)),
+            Tab(text: 'Profile'),
+            Tab(text: 'Password'),
           ],
         ),
       ),
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildProfileTab(),
-          _buildPasswordTab(),
+          _buildProfileTab().animate().fadeIn(duration: 400.ms),
+          _buildPasswordTab().animate().fadeIn(duration: 400.ms),
         ],
       ),
     );
@@ -212,73 +227,111 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> with Sing
 
   Widget _buildProfileTab() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.all(24.0),
       child: Form(
         key: _profileFormKey,
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const CircleAvatar(
-              radius: 50,
-              child: Icon(Icons.person, size: 50),
-            ),
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.primary,
+                  width: 3,
+                ),
+              ),
+              child: Center(
+                child: Text(
+                  widget.user.username.substring(0, 1).toUpperCase(),
+                  style: GoogleFonts.montserrat(
+                    fontSize: 48,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+              ),
+            ).animate().scale(duration: 400.ms),
             const SizedBox(height: 24),
+            
             if (_errorMessage != null)
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(12),
                 margin: const EdgeInsets.only(bottom: 16),
-                color: Colors.red.shade100,
-                width: double.infinity,
-                child: Text(
-                  _errorMessage!,
-                  style: TextStyle(color: Colors.red.shade900),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.error_outline, color: Colors.red.shade700),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        _errorMessage!,
+                        style: TextStyle(color: Colors.red.shade900),
+                      ),
+                    ),
+                  ],
                 ),
               ),
+              
             if (_successMessage != null)
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(12),
                 margin: const EdgeInsets.only(bottom: 16),
-                color: Colors.green.shade100,
-                width: double.infinity,
-                child: Text(
-                  _successMessage!,
-                  style: TextStyle(color: Colors.green.shade900),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.green.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.check_circle_outline, color: Colors.green.shade700),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        _successMessage!,
+                        style: TextStyle(color: Colors.green.shade900),
+                      ),
+                    ),
+                  ],
                 ),
               ),
+              
             TextFormField(
               controller: _usernameController,
               focusNode: _usernameFocusNode,
-              textInputAction: TextInputAction.next,
-              onFieldSubmitted: (_) {
-                FocusScope.of(context).requestFocus(_emailFocusNode);
-              },
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Username',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.person),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                prefixIcon: const Icon(Icons.person),
               ),
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Please enter a username';
                 }
-                if (value.length < 4) {
-                  return 'Username must be at least 4 characters';
-                }
                 return null;
               },
-            ),
-            const SizedBox(height: 16),
+            ).animate().fadeIn(delay: 100.ms).slideY(begin: 0.3, delay: 100.ms),
+            
+            const SizedBox(height: 20),
+            
             TextFormField(
               controller: _emailController,
               focusNode: _emailFocusNode,
-              textInputAction: TextInputAction.done,
-              onFieldSubmitted: (_) {
-                if (!_isLoading) _updateProfile();
-              },
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Email',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.email),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                prefixIcon: const Icon(Icons.email),
               ),
               keyboardType: TextInputType.emailAddress,
               validator: (value) {
@@ -291,20 +344,39 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> with Sing
                 }
                 return null;
               },
-            ),
+            ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.3, delay: 200.ms),
+            
             const SizedBox(height: 24),
+            
             SizedBox(
               width: double.infinity,
+              height: 54,
               child: ElevatedButton(
                 onPressed: _isLoading ? null : _updateProfile,
                 style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16.0),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  elevation: 2,
                 ),
                 child: _isLoading
-                    ? const CircularProgressIndicator()
-                    : const Text('SAVE CHANGES'),
+                    ? SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : Text(
+                        'SAVE CHANGES',
+                        style: GoogleFonts.montserrat(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
               ),
-            ),
+            ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.3, delay: 300.ms),
           ],
         ),
       ),
@@ -313,93 +385,159 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> with Sing
 
   Widget _buildPasswordTab() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.all(24.0),
       child: Form(
         key: _passwordFormKey,
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const Icon(Icons.lock, size: 50),
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.2),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.security,
+                size: 60,
+                color: Colors.blue,
+              ),
+            ).animate().scale(duration: 400.ms),
             const SizedBox(height: 24),
+            
+            Text(
+              'Change Password',
+              style: GoogleFonts.montserrat(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Enter your current password and a new password',
+              style: GoogleFonts.montserrat(
+                fontSize: 14,
+                color: Colors.grey,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            
             if (_errorMessage != null)
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(12),
                 margin: const EdgeInsets.only(bottom: 16),
-                color: Colors.red.shade100,
-                width: double.infinity,
-                child: Text(
-                  _errorMessage!,
-                  style: TextStyle(color: Colors.red.shade900),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.error_outline, color: Colors.red.shade700),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        _errorMessage!,
+                        style: TextStyle(color: Colors.red.shade900),
+                      ),
+                    ),
+                  ],
                 ),
               ),
+              
             if (_successMessage != null)
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(12),
                 margin: const EdgeInsets.only(bottom: 16),
-                color: Colors.green.shade100,
-                width: double.infinity,
-                child: Text(
-                  _successMessage!,
-                  style: TextStyle(color: Colors.green.shade900),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.green.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.check_circle_outline, color: Colors.green.shade700),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        _successMessage!,
+                        style: TextStyle(color: Colors.green.shade900),
+                      ),
+                    ),
+                  ],
                 ),
               ),
+              
             TextFormField(
               controller: _currentPasswordController,
               focusNode: _currentPasswordFocusNode,
+              obscureText: true,
               textInputAction: TextInputAction.next,
               onFieldSubmitted: (_) {
                 FocusScope.of(context).requestFocus(_newPasswordFocusNode);
               },
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Current Password',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.lock_outline),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                prefixIcon: const Icon(Icons.lock),
               ),
-              obscureText: true,
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Please enter your current password';
                 }
                 return null;
               },
-            ),
+            ).animate().fadeIn(delay: 100.ms).slideY(begin: 0.3, delay: 100.ms),
+            
             const SizedBox(height: 16),
+            
             TextFormField(
               controller: _newPasswordController,
               focusNode: _newPasswordFocusNode,
+              obscureText: true,
               textInputAction: TextInputAction.next,
               onFieldSubmitted: (_) {
                 FocusScope.of(context).requestFocus(_confirmPasswordFocusNode);
               },
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'New Password',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.lock_outline),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                prefixIcon: const Icon(Icons.lock_outline),
               ),
-              obscureText: true,
               validator: (value) {
                 if (value == null || value.isEmpty) {
-                  return 'Please enter a new password';
+                  return 'Please enter your new password';
                 }
                 if (value.length < 6) {
                   return 'Password must be at least 6 characters';
                 }
                 return null;
               },
-            ),
+            ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.3, delay: 200.ms),
+            
             const SizedBox(height: 16),
+            
             TextFormField(
               controller: _confirmPasswordController,
               focusNode: _confirmPasswordFocusNode,
+              obscureText: true,
               textInputAction: TextInputAction.done,
               onFieldSubmitted: (_) {
                 if (!_isLoading) _changePassword();
               },
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Confirm New Password',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.lock_outline),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                prefixIcon: const Icon(Icons.lock_outline),
               ),
-              obscureText: true,
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Please confirm your new password';
@@ -409,20 +547,39 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> with Sing
                 }
                 return null;
               },
-            ),
+            ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.3, delay: 300.ms),
+            
             const SizedBox(height: 24),
+            
             SizedBox(
               width: double.infinity,
+              height: 54,
               child: ElevatedButton(
                 onPressed: _isLoading ? null : _changePassword,
                 style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16.0),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  elevation: 2,
                 ),
                 child: _isLoading
-                    ? const CircularProgressIndicator()
-                    : const Text('CHANGE PASSWORD'),
+                    ? SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : Text(
+                        'CHANGE PASSWORD',
+                        style: GoogleFonts.montserrat(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
               ),
-            ),
+            ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.3, delay: 400.ms),
           ],
         ),
       ),
