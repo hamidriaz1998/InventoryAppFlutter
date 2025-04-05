@@ -21,6 +21,7 @@ void main() {
 
     await initializeApp();
   }, (error, stack) {
+    print(error);
   });
 }
 
