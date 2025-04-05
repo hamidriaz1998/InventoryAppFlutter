@@ -286,6 +286,24 @@ class _InventoryHomePageState extends State<InventoryHomePage>
                           onPressed: _logout,
                           child: const Text('Logout'),
                         ),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.of(ctx).pop();
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => AccountSettingsScreen(
+                                  dbHelper: widget.dbHelper,
+                                  user: _currentUser!,
+                                ),
+                              ),
+                            ).then((_) {
+                              // Refresh user data when returning from account settings
+                              _loadUserAndItems();
+                            });
+                          },
+                          child: const Text("Settings")
+                        )
                       ],
                     ),
               );
