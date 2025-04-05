@@ -113,7 +113,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
         context: context,
         builder: (context) {
           return StatefulBuilder(
-            builder: (context, setState) {
+            builder: (context, setDialogState) {
               return AlertDialog(
                 title: Text(category == null ? 'Add Category' : 'Edit Category'),
                 content: Form(
@@ -161,30 +161,28 @@ class _CategoryScreenState extends State<CategoryScreen> {
                                 showDialog(
                                   context: context,
                                   builder: (BuildContext context) {
-                                    return StatefulBuilder(
-                                      builder: (context, setState) {
-                                        return AlertDialog(
-                                          title: const Text('Pick a color'),
-                                          content: SingleChildScrollView(
-                                            child: ColorPicker(
-                                              pickerColor: selectedColor,
-                                              onColorChanged: (Color color) {
-                                                setState(() {
-                                                  selectedColor = color;
-                                                });
-                                              },
-                                            ),
-                                          ),
-                                          actions: <Widget>[
-                                            TextButton(
-                                              child: const Text('Select'),
-                                              onPressed: () {
-                                                Navigator.of(context).pop();
-                                              },
-                                            ),
-                                          ],
-                                        );
-                                      },
+                                    return AlertDialog(
+                                      title: const Text('Pick a color'),
+                                      content: SingleChildScrollView(
+                                        child: ColorPicker(
+                                          pickerColor: selectedColor,
+                                          onColorChanged: (Color color) {
+                                            selectedColor = color;
+                                          },
+                                        ),
+                                      ),
+                                      actions: <Widget>[
+                                        TextButton(
+                                          child: const Text('Select'),
+                                          onPressed: () {
+                                            // Update the color in the parent dialog when selected
+                                            setDialogState(() {
+                                              selectedColor = selectedColor;
+                                            });
+                                            Navigator.of(context).pop();
+                                          },
+                                        ),
+                                      ],
                                     );
                                   },
                                 );
