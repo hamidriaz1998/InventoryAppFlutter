@@ -54,8 +54,21 @@ class DatabaseHelper {
   Future<int> deleteCategory(int id) => _categoryRepository.deleteCategory(id);
 
   // Transaction operations
-  Future<int> recordTransaction(int itemId, int userId, String type, int quantity, String notes) => 
-      _transactionRepository.recordTransaction(itemId, userId, type, quantity, notes);
+  Future<int> recordTransaction(int itemId, int userId, String type, int quantity, String notes, {double? unitPrice, double? totalAmount}) => 
+      _transactionRepository.recordTransaction(itemId, userId, type, quantity, notes, unitPrice: unitPrice, totalAmount: totalAmount);
+  
+  Future<int> sellItem(int itemId, int userId, int quantity, double unitPrice, String notes) => 
+      _transactionRepository.sellItem(itemId, userId, quantity, unitPrice, notes);
+  
+  Future<int> restockItem(int itemId, int userId, int quantity, double unitPrice, String notes) => 
+      _transactionRepository.restockItem(itemId, userId, quantity, unitPrice, notes);
+  
   Future<List<Map<String, dynamic>>> getItemTransactions(int itemId) => 
       _transactionRepository.getItemTransactions(itemId);
+  
+  Future<List<Map<String, dynamic>>> getSalesTransactions({DateTime? startDate, DateTime? endDate}) => 
+      _transactionRepository.getSalesTransactions(startDate: startDate, endDate: endDate);
+  
+  Future<double> getTotalSalesAmount({DateTime? startDate, DateTime? endDate}) => 
+      _transactionRepository.getTotalSalesAmount(startDate: startDate, endDate: endDate);
 }

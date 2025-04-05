@@ -84,26 +84,52 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  late bool _isDarkMode;
+  late ThemeMode _themeMode;
 
   @override
   void initState() {
     super.initState();
-    _isDarkMode = widget.isDarkMode;
+    _themeMode = widget.isDarkMode ? ThemeMode.dark : ThemeMode.light;
+    _initThemeMode();
+  }
+  
+  Future<void> _initThemeMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    final String? themeModeString = prefs.getString('themeMode');
+    
+    if (themeModeString != null) {
+      setState(() {
+        if (themeModeString == 'system') {
+          _themeMode = ThemeMode.system;
+        } else if (themeModeString == 'dark') {
+          _themeMode = ThemeMode.dark;
+        } else {
+          _themeMode = ThemeMode.light;
+        }
+      });
+    }
   }
 
-  void _toggleTheme() async {
+  Future<void> _setThemeMode(ThemeMode mode) async {
     setState(() {
-      _isDarkMode = !_isDarkMode;
+      _themeMode = mode;
     });
 
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('isDarkMode', _isDarkMode);
+    await prefs.setString('themeMode', mode == ThemeMode.system 
+                                      ? 'system' 
+                                      : (mode == ThemeMode.dark ? 'dark' : 'light'));
+    await prefs.setBool('isDarkMode', mode == ThemeMode.dark);
+  }
+
+  // _toggleTheme has been moved to inventory_home.dart
+  // We'll keep a simpler version that can be called from the inventory_home
+  void _toggleTheme(ThemeMode mode) async {
+    _setThemeMode(mode);
   }
 
   @override
   Widget build(BuildContext context) {
-    // Define primary, secondary and surface colors
     const Color primaryColor = Color(0xFF00C291);
     const Color secondaryColor = Color(0xFF007BFF);
     const Color lightSurfaceColor = Color(0xFFF5F5F5);
@@ -138,6 +164,11 @@ class _MyAppState extends State<MyApp> {
             foregroundColor: MaterialStateProperty.all<Color>(Colors.white),
           ),
         ),
+        datePickerTheme: DatePickerThemeData(
+          backgroundColor: Colors.white,
+          headerBackgroundColor: primaryColor,
+          headerForegroundColor: Colors.white,
+        ),
       ),
       darkTheme: ThemeData.dark().copyWith(
         colorScheme: ColorScheme.dark(
@@ -166,13 +197,32 @@ class _MyAppState extends State<MyApp> {
             foregroundColor: MaterialStateProperty.all<Color>(Colors.white),
           ),
         ),
+        datePickerTheme: DatePickerThemeData(
+          backgroundColor: darkSurfaceColor,
+          headerBackgroundColor: primaryColor,
+          headerForegroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          dayBackgroundColor: MaterialStateColor.resolveWith((states) => 
+            states.contains(MaterialState.selected) ? primaryColor : Colors.transparent
+          ),
+          dayForegroundColor: MaterialStateColor.resolveWith((states) => 
+            states.contains(MaterialState.selected) ? Colors.white : Colors.white
+          ),
+          todayBackgroundColor: MaterialStateColor.resolveWith((states) => 
+            states.contains(MaterialState.selected) ? primaryColor : Colors.transparent
+          ),
+          todayForegroundColor: MaterialStateColor.resolveWith((states) => 
+            states.contains(MaterialState.selected) ? Colors.white : primaryColor
+          ),
+        ),
       ),
-      themeMode: _isDarkMode ? ThemeMode.dark : ThemeMode.light,
+      themeMode: _themeMode,
       home: widget.isLoggedIn
           ? InventoryHomePage(
               dbHelper: widget.dbHelper,
               toggleTheme: _toggleTheme,
-              isDarkMode: _isDarkMode,
+              isDarkMode: _themeMode == ThemeMode.dark,
+              themeMode: _themeMode,
             )
           : LoginScreen(dbHelper: widget.dbHelper),
       routes: {
@@ -181,7 +231,8 @@ class _MyAppState extends State<MyApp> {
         '/home': (context) => InventoryHomePage(
               dbHelper: widget.dbHelper,
               toggleTheme: _toggleTheme,
-              isDarkMode: _isDarkMode,
+              isDarkMode: _themeMode == ThemeMode.dark,
+              themeMode: _themeMode,
             ),
         '/categories': (context) => CategoryScreen(dbHelper: widget.dbHelper),
       },

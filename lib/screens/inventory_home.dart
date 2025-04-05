@@ -1,7 +1,7 @@
 // inventory_home.dart
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart'; // Fixed import for DateFormat
 import 'package:fl_chart/fl_chart.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -15,17 +15,20 @@ import '../models/category.dart';
 import 'item_form.dart';
 import 'category_screen.dart';
 import 'account_settings_screen.dart';
+import 'sales_report_screen.dart';
 
 class InventoryHomePage extends StatefulWidget {
   final DatabaseHelper dbHelper;
-  final Function toggleTheme;
+  final Function(ThemeMode) toggleTheme; // Update function signature
   final bool isDarkMode;
+  final ThemeMode themeMode;
 
   const InventoryHomePage({
     Key? key,
     required this.dbHelper,
     required this.toggleTheme,
     required this.isDarkMode,
+    required this.themeMode,
   }) : super(key: key);
 
   @override
@@ -245,6 +248,53 @@ class _InventoryHomePageState extends State<InventoryHomePage>
     return category.name;
   }
 
+  void _toggleTheme() async {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Select Theme'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            RadioListTile<ThemeMode>(
+              title: const Text('Light'),
+              value: ThemeMode.light,
+              groupValue: widget.themeMode,
+              onChanged: (ThemeMode? value) {
+                if (value != null) {
+                  widget.toggleTheme(value);
+                  Navigator.pop(context);
+                }
+              },
+            ),
+            RadioListTile<ThemeMode>(
+              title: const Text('Dark'),
+              value: ThemeMode.dark,
+              groupValue: widget.themeMode,
+              onChanged: (ThemeMode? value) {
+                if (value != null) {
+                  widget.toggleTheme(value);
+                  Navigator.pop(context);
+                }
+              },
+            ),
+            RadioListTile<ThemeMode>(
+              title: const Text('System'),
+              value: ThemeMode.system,
+              groupValue: widget.themeMode,
+              onChanged: (ThemeMode? value) {
+                if (value != null) {
+                  widget.toggleTheme(value);
+                  Navigator.pop(context);
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -420,7 +470,7 @@ class _InventoryHomePageState extends State<InventoryHomePage>
                       value: category.id,
                       child: Text(category.name),
                     );
-                  }).toList(),
+                  }),
                 ],
               ),
               IconButton(
@@ -452,204 +502,219 @@ class _InventoryHomePageState extends State<InventoryHomePage>
                       style: TextStyle(fontSize: 18),
                     ),
                   )
-                  : ListView.builder(
-                    itemCount: _items.length,
-                    itemBuilder: (context, index) {
-                      final item = _items[index];
+                  : RefreshIndicator(
+                      onRefresh: () async {
+                        // Reload data when the user pulls down
+                        await _loadCategories();
+                        await _loadItems();
+                      },
+                      child: ListView.builder(
+                        itemCount: _items.length,
+                        itemBuilder: (context, index) {
+                          final item = _items[index];
 
-                      // Find the category color if available
-                      Color itemColor = Colors.blue.shade100;
-                      if (item.categoryId != null) {
-                        final category = _categories.firstWhere(
-                          (c) => c.id == item.categoryId,
-                          orElse: () => Category(name: 'Unknown'),
-                        );
+                          // Find the category color if available
+                          Color itemColor = Colors.blue.shade100;
+                          if (item.categoryId != null) {
+                            final category = _categories.firstWhere(
+                              (c) => c.id == item.categoryId,
+                              orElse: () => Category(name: 'Unknown'),
+                            );
 
-                        if (category.color != null) {
-                          // Convert hex color string to Color
-                          itemColor = Color(
-                            int.parse(category.color!.replaceAll('#', '0xFF')),
-                          );
-                        }
-                      }
+                            if (category.color != null) {
+                              // Convert hex color string to Color
+                              itemColor = Color(
+                                int.parse(category.color!.replaceAll('#', '0xFF')),
+                              );
+                            }
+                          }
 
-                      return Dismissible(
-                        key: Key(item.id.toString()),
-                        background: Container(
-                          color: Colors.red,
-                          alignment: Alignment.centerRight,
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: const Icon(Icons.delete, color: Colors.white),
-                        ),
-                        direction: DismissDirection.endToStart,
-                        confirmDismiss: (direction) async {
-                          return await showDialog(
-                            context: context,
-                            builder:
-                                (context) => AlertDialog(
-                                  title: const Text('Confirm Delete'),
-                                  content: Text(
-                                    'Are you sure you want to delete ${item.name}?',
-                                  ),
-                                  actions: [
-                                    TextButton(
-                                      onPressed:
-                                          () =>
-                                              Navigator.of(context).pop(false),
-                                      child: const Text('Cancel'),
-                                    ),
-                                    TextButton(
-                                      onPressed:
-                                          () => Navigator.of(context).pop(true),
-                                      child: const Text('Delete'),
-                                    ),
-                                  ],
-                                ),
-                          );
-                        },
-                        onDismissed: (direction) async {
-                          await widget.dbHelper.deleteItem(item.id!);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('${item.name} deleted')),
-                          );
-                          _loadItems();
-                        },
-                        child: Card(
-                          margin: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          child: ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: itemColor,
-                              child: Text(
-                                item.name.substring(0, 1).toUpperCase(),
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
+                          return Dismissible(
+                            key: Key(item.id.toString()),
+                            background: Container(
+                              color: Colors.red,
+                              alignment: Alignment.centerRight,
+                              padding: const EdgeInsets.symmetric(horizontal: 20),
+                              child: const Icon(Icons.delete, color: Colors.white),
                             ),
-                            title: Text(item.name),
-                            subtitle: Text(
-                              'Category: ${_getCategoryName(item.categoryId) ?? 'N/A'}',
-                            ),
-                            trailing: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Text(
-                                  '\$${item.price.toStringAsFixed(2)}',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                Text('Qty: ${item.quantity}'),
-                              ],
-                            ),
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder:
-                                      (context) => ItemFormScreen(
-                                        dbHelper: widget.dbHelper,
-                                        userId: _currentUser!.id!,
-                                        item: item,
-                                        onItemSaved: () {
-                                          _loadItems();
-                                        },
+                            direction: DismissDirection.endToStart,
+                            confirmDismiss: (direction) async {
+                              return await showDialog(
+                                context: context,
+                                builder:
+                                    (context) => AlertDialog(
+                                      title: const Text('Confirm Delete'),
+                                      content: Text(
+                                        'Are you sure you want to delete ${item.name}?',
                                       ),
-                                ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed:
+                                              () =>
+                                                  Navigator.of(context).pop(false),
+                                          child: const Text('Cancel'),
+                                        ),
+                                        TextButton(
+                                          onPressed:
+                                              () => Navigator.of(context).pop(true),
+                                          child: const Text('Delete'),
+                                        ),
+                                      ],
+                                    ),
                               );
                             },
-                          ),
-                        ),
-                      );
-                    },
-                  ),
+                            onDismissed: (direction) async {
+                              await widget.dbHelper.deleteItem(item.id!);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('${item.name} deleted')),
+                              );
+                              _loadItems();
+                            },
+                            child: Card(
+                              margin: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              child: ListTile(
+                                leading: CircleAvatar(
+                                  backgroundColor: itemColor,
+                                  child: Text(
+                                    item.name.substring(0, 1).toUpperCase(),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                title: Text(item.name),
+                                subtitle: Text(
+                                  'Category: ${_getCategoryName(item.categoryId) ?? 'N/A'}',
+                                ),
+                                trailing: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      '\$${item.price.toStringAsFixed(2)}',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    Text('Qty: ${item.quantity}'),
+                                  ],
+                                ),
+                                onTap: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder:
+                                          (context) => ItemFormScreen(
+                                            dbHelper: widget.dbHelper,
+                                            userId: _currentUser!.id!,
+                                            item: item,
+                                            onItemSaved: () {
+                                              _loadItems();
+                                            },
+                                          ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
         ),
       ],
     );
   }
 
   Widget _buildDashboardTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Inventory Summary',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _buildSummaryCard(
-                        title: 'Total Items',
-                        value: _items.length.toString(),
-                        icon: Icons.inventory_2,
-                        color: Colors.blue,
-                      ),
-                      _buildSummaryCard(
-                        title: 'Categories',
-                        value: _categories.length.toString(),
-                        icon: Icons.category,
-                        color: Colors.green,
-                      ),
-                      _buildSummaryCard(
-                        title: 'Total Value',
-                        value: '\$${_calculateTotalValue().toStringAsFixed(2)}',
-                        icon: Icons.attach_money,
-                        color: Colors.amber,
-                      ),
-                    ],
-                  ),
-                ],
+    return RefreshIndicator(
+      onRefresh: () async {
+        // Reload data when the user pulls down
+        await _loadCategories();
+        await _loadItems();
+      },
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(), // Important for RefreshIndicator to work with SingleChildScrollView
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Inventory Summary',
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _buildSummaryCard(
+                          title: 'Total Items',
+                          value: _items.length.toString(),
+                          icon: Icons.inventory_2,
+                          color: Colors.blue,
+                        ),
+                        _buildSummaryCard(
+                          title: 'Categories',
+                          value: _categories.length.toString(),
+                          icon: Icons.category,
+                          color: Colors.green,
+                        ),
+                        _buildSummaryCard(
+                          title: 'Total Value',
+                          value: '\$${_calculateTotalValue().toStringAsFixed(2)}',
+                          icon: Icons.attach_money,
+                          color: Colors.amber,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 20),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Low Stock Items',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(height: 200, child: _buildLowStockList()),
-                ],
+            const SizedBox(height: 20),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Low Stock Items',
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(height: 200, child: _buildLowStockList()),
+                  ],
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 20),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Inventory by Category',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(height: 300, child: _buildCategoryChart()),
-                ],
+            const SizedBox(height: 20),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Inventory by Category',
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(height: 300, child: _buildCategoryChart()),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -814,14 +879,10 @@ class _InventoryHomePageState extends State<InventoryHomePage>
         Card(
           child: ListTile(
             leading: const Icon(Icons.dark_mode),
-            title: const Text('Dark Mode'),
-            subtitle: Text(widget.isDarkMode ? 'Enabled' : 'Disabled'),
-            trailing: Switch(
-              value: widget.isDarkMode,
-              onChanged: (value) {
-                widget.toggleTheme();
-              },
-            ),
+            title: const Text('Theme Settings'),
+            subtitle: Text(_getThemeModeText()),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: _toggleTheme,
           ),
         ),
         Card(
@@ -851,6 +912,25 @@ class _InventoryHomePageState extends State<InventoryHomePage>
             subtitle: const Text('Export and analyze data'),
             trailing: const Icon(Icons.chevron_right),
             onTap: _generatePdfReport,
+          ),
+        ),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.point_of_sale),
+            title: const Text('Sales Reports'),
+            subtitle: const Text('View and analyze sales transactions'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => SalesReportScreen(
+                    dbHelper: widget.dbHelper,
+                    userId: _currentUser!.id!,
+                  ),
+                ),
+              );
+            },
           ),
         ),
         Card(
@@ -886,5 +966,16 @@ class _InventoryHomePageState extends State<InventoryHomePage>
         ),
       ],
     );
+  }
+
+  String _getThemeModeText() {
+    switch (widget.themeMode) {
+      case ThemeMode.light:
+        return 'Light Mode';
+      case ThemeMode.dark:
+        return 'Dark Mode';
+      case ThemeMode.system:
+        return 'System Default';
+    }
   }
 }

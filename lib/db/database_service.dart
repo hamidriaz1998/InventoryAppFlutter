@@ -22,7 +22,7 @@ class DatabaseService {
     String path = join(await getDatabasesPath(), 'inventory_database.db');
     return await openDatabase(
       path,
-      version: 3, // Increment version number for migrations
+      version: 4, 
       onCreate: _createDatabase,
       onUpgrade: _upgradeDatabase,
     );
@@ -79,109 +79,131 @@ class DatabaseService {
         quantity INTEGER,
         date TEXT,
         notes TEXT,
+        unit_price REAL,
+        total_amount REAL,
         FOREIGN KEY (item_id) REFERENCES items (id),
         FOREIGN KEY (user_id) REFERENCES users (id)
       )
     ''');
+    
+    // Seed the database with initial data
+    if (version >= 4) {
+      await _seedDatabase(db);
+    }
   }
 
   Future<void> _upgradeDatabase(Database db, int oldVersion, int newVersion) async {
-    // All migrations consolidated into a single function
+    // Only perform schema changes here
     if (oldVersion < 2) {
-      // Ensure all tables exist (in case upgrading from version 1)
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS users(
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          username TEXT UNIQUE,
-          password_hash TEXT,
-          email TEXT,
-          created_at TEXT
-        )
-      ''');
-
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS categories(
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          name TEXT NOT NULL,
-          description TEXT,
-          color TEXT
-        )
-      ''');
-
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS inventory_transactions(
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          item_id INTEGER,
-          user_id INTEGER,
-          transaction_type TEXT,
-          quantity INTEGER,
-          date TEXT,
-          notes TEXT,
-          FOREIGN KEY (item_id) REFERENCES items (id),
-          FOREIGN KEY (user_id) REFERENCES users (id)
-        )
-      ''');
-
-      // Check if items table exists and create it if it doesn't
-      var tables = await db.rawQuery("SELECT name FROM sqlite_master WHERE type='table' AND name='items'");
-      if (tables.isEmpty) {
-        await db.execute('''
-          CREATE TABLE items(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            name TEXT,
-            quantity INTEGER,
-            price REAL,
-            category_id INTEGER,
-            image_path TEXT,
-            barcode TEXT,
-            created_at TEXT,
-            updated_at TEXT,
-            FOREIGN KEY (user_id) REFERENCES users (id),
-            FOREIGN KEY (category_id) REFERENCES categories (id)
-          )
-        ''');
-      } else {
-        // If the table exists, make sure all columns exist
-        var columns = await db.rawQuery('PRAGMA table_info(items)');
-        
-        Map<String, bool> columnExists = {
-          'user_id': false,
-          'category_id': false,
-          'image_path': false,
-          'barcode': false,
-          'created_at': false,
-          'updated_at': false,
-          'description': false,
-        };
-        
-        for (var col in columns) {
-          String name = col['name'] as String;
-          if (columnExists.containsKey(name)) {
-            columnExists[name] = true;
-          }
+      // Add any missing columns to items table
+      var columns = await db.rawQuery('PRAGMA table_info(items)');
+      
+      Map<String, String> missingColumns = {
+        'description': 'TEXT',
+        'user_id': 'INTEGER',
+        'category_id': 'INTEGER',
+        'image_path': 'TEXT',
+        'barcode': 'TEXT',
+        'created_at': 'TEXT',
+        'updated_at': 'TEXT',
+      };
+      
+      for (var col in columns) {
+        String name = col['name'] as String;
+        if (missingColumns.containsKey(name)) {
+          missingColumns.remove(name);
         }
-        
-        // Add missing columns
-        for (var entry in columnExists.entries) {
-          if (!entry.value) {
-            String type = entry.key == 'description' ? 'TEXT' : 
-                        (entry.key.endsWith('_id') ? 'INTEGER' : 
-                         (entry.key.endsWith('_at') ? 'TEXT' : 'TEXT'));
-            try {
-              await db.execute('ALTER TABLE items ADD COLUMN ${entry.key} $type');
-            } catch (e) {
-              print('Error adding column ${entry.key}: $e');
-            }
-          }
+      }
+      
+      // Add missing columns
+      for (var entry in missingColumns.entries) {
+        try {
+          await db.execute('ALTER TABLE items ADD COLUMN ${entry.key} ${entry.value}');
+        } catch (e) {
+          print('Error adding column ${entry.key}: $e');
         }
       }
     }
 
-    // For any future migrations, add conditions like:
     if (oldVersion < 3) {
-      // Add new migrations for version 3 here
+      // Add the unit_price and total_amount columns to support sales and restocks
+      try {
+        await db.execute('ALTER TABLE inventory_transactions ADD COLUMN unit_price REAL');
+        await db.execute('ALTER TABLE inventory_transactions ADD COLUMN total_amount REAL');
+      } catch (e) {
+        print('Error adding sales columns to inventory_transactions: $e');
+      }
     }
+
+    // Seed data if upgrading to version 4
+    if (oldVersion < 4 && newVersion >= 4) {
+      await _seedDatabase(db);
+    }
+  }
+
+  Future<void> _seedDatabase(Database db) async {
+    // Insert sample data
+    
+    // First check if data already exists
+    final categoryCount = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM categories'));
+    if (categoryCount != null && categoryCount > 0) {
+      return; // Data already exists, no need to seed
+    }
+    
+    // Insert sample categories
+    await db.insert('categories', {
+      'name': 'Electronics',
+      'description': 'Electronic devices and accessories',
+      'color': '#FF5722'
+    });
+
+    await db.insert('categories', {
+      'name': 'Office Supplies',
+      'description': 'Items used in office environments',
+      'color': '#2196F3'
+    });
+
+    await db.insert('categories', {
+      'name': 'Kitchen',
+      'description': 'Kitchen appliances and utensils',
+      'color': '#4CAF50'
+    });
+
+    final timestamp = DateTime.now().toIso8601String();
+    // Insert sample items
+    await db.insert('items', {
+      'user_id': 1,
+      'name': 'Laptop',
+      'description': 'High-performance laptop',
+      'quantity': 5,
+      'price': 1200.00,
+      'category_id': 1,
+      'created_at': timestamp,
+      'updated_at': timestamp
+    });
+
+    await db.insert('items', {
+      'user_id': 1,
+      'name': 'Notebook',
+      'description': 'Lined paper notebook',
+      'quantity': 20,
+      'price': 4.99,
+      'category_id': 2,
+      'created_at': timestamp,
+      'updated_at': timestamp
+    });
+
+    // Insert sample transaction
+    await db.insert('inventory_transactions', {
+      'item_id': 1,
+      'user_id': 1,
+      'transaction_type': 'initial_stock',
+      'quantity': 5,
+      'date': timestamp,
+      'notes': 'Initial inventory',
+      'unit_price': 1000.00,
+      'total_amount': 5000.00
+    });
   }
 
   Future close() async {

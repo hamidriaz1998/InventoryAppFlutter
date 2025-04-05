@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../db/database_helper.dart';
 import '../models/item.dart';
 import '../models/category.dart';
+import 'item_transaction_screen.dart';
 
 class ItemFormScreen extends StatefulWidget {
   final DatabaseHelper dbHelper;
@@ -202,6 +203,38 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
             tooltip: 'Manage Categories',
             onPressed: _showCategoryManagement,
           ),
+          if (_isEditing)
+            PopupMenuButton<String>(
+              onSelected: (value) {
+                if (value == 'sell') {
+                  _showSellItemScreen();
+                } else if (value == 'restock') {
+                  _showRestockItemScreen();
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'sell',
+                  child: Row(
+                    children: [
+                      Icon(Icons.point_of_sale, color: Colors.green),
+                      SizedBox(width: 8),
+                      Text('Sell'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'restock',
+                  child: Row(
+                    children: [
+                      Icon(Icons.add_shopping_cart, color: Colors.blue),
+                      SizedBox(width: 8),
+                      Text('Restock'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
         ],
       ),
       body: SingleChildScrollView(
@@ -318,9 +351,46 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
                 ),
               ),
               const SizedBox(height: 20),
+              
+              if (_isEditing)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16.0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          icon: const Icon(Icons.point_of_sale),
+                          label: const Text('SELL'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            foregroundColor: Colors.white,
+                          ),
+                          onPressed: _showSellItemScreen,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          icon: const Icon(Icons.add_shopping_cart),
+                          label: const Text('RESTOCK'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue,
+                            foregroundColor: Colors.white,
+                          ),
+                          onPressed: _showRestockItemScreen,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              
+              const SizedBox(height: 20),
+              
               if (_isEditing)
                 _buildTransactionHistory(),
+                
               const SizedBox(height: 20),
+              
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -335,6 +405,46 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  void _showSellItemScreen() {
+    if (widget.item == null || widget.item!.quantity <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No stock available to sell'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ItemTransactionScreen(
+          dbHelper: widget.dbHelper,
+          item: widget.item!,
+          userId: widget.userId,
+          transactionType: TransactionType.sale,
+          onTransactionComplete: widget.onItemSaved,
+        ),
+      ),
+    );
+  }
+
+  void _showRestockItemScreen() {
+    if (widget.item == null) return;
+    
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ItemTransactionScreen(
+          dbHelper: widget.dbHelper,
+          item: widget.item!,
+          userId: widget.userId,
+          transactionType: TransactionType.restock,
+          onTransactionComplete: widget.onItemSaved,
         ),
       ),
     );
@@ -370,21 +480,47 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
             ),
             const SizedBox(height: 8),
             SizedBox(
-              height: 150,
+              height: 200,
               child: ListView.builder(
                 itemCount: transactions.length,
                 itemBuilder: (context, index) {
                   final transaction = transactions[index];
+                  final type = transaction['transaction_type'] as String;
+                  final quantity = transaction['quantity'] as int;
+                  final hasPrice = transaction['unit_price'] != null;
+                  final unitPrice = transaction['unit_price'] as double?;
+                  final totalAmount = transaction['total_amount'] as double?;
+                  
+                  String subtitle = 'Quantity: $quantity';
+                  if (hasPrice && unitPrice != null) {
+                    subtitle += ' - Unit: \$${unitPrice.toStringAsFixed(2)}';
+                  }
+                  if (transaction['notes'] != null) {
+                    subtitle += ' - ${transaction['notes']}';
+                  }
+                  
                   return Card(
                     child: ListTile(
                       leading: Icon(
-                        _getTransactionIcon(transaction['transaction_type']),
-                        color: _getTransactionColor(transaction['transaction_type']),
+                        _getTransactionIcon(type),
+                        color: _getTransactionColor(type),
                       ),
-                      title: Text(transaction['transaction_type']),
-                      subtitle: Text(
-                        'Quantity: ${transaction['quantity']} - ${transaction['notes']}',
+                      title: Row(
+                        children: [
+                          Text(type),
+                          if (totalAmount != null) ...[
+                            const Spacer(),
+                            Text(
+                              '\$${totalAmount.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
+                      subtitle: Text(subtitle),
                       trailing: Text(
                         DateFormat('MMM dd, yyyy').format(
                           DateTime.parse(transaction['date']),
@@ -409,6 +545,10 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
         return Icons.edit;
       case 'DELETE':
         return Icons.delete;
+      case 'SALE':
+        return Icons.point_of_sale;
+      case 'RESTOCK':
+        return Icons.add_shopping_cart;
       default:
         return Icons.sync;
     }
@@ -422,6 +562,10 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
         return Colors.blue;
       case 'DELETE':
         return Colors.red;
+      case 'SALE':
+        return Colors.orange;
+      case 'RESTOCK':
+        return Colors.purple;
       default:
         return Colors.grey;
     }
