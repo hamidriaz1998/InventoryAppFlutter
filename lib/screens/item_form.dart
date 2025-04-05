@@ -54,6 +54,7 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
       _isEditing = true;
       _pageTitle = 'Edit Item';
       _nameController.text = widget.item!.name;
+      // Still initialize the quantity controller but won't show the field in UI
       _quantityController.text = widget.item!.quantity.toString();
       _priceController.text = widget.item!.price.toStringAsFixed(2);
       _selectedCategoryId = widget.item!.categoryId;
@@ -119,10 +120,11 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
       final now = DateTime.now().toIso8601String();
       
       if (_isEditing) {
-        // Update existing item
+        // Update existing item but preserve the quantity
         final updatedItem = widget.item!.copyWith(
           name: _nameController.text.trim(),
-          quantity: int.parse(_quantityController.text.trim()),
+          // Keep original quantity when editing
+          quantity: widget.item!.quantity,
           categoryId: _selectedCategory?.id,
           category: _selectedCategory?.name,
           price: double.parse(_priceController.text.trim()),
@@ -262,7 +264,12 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
                 focusNode: _nameFocusNode,
                 textInputAction: TextInputAction.next,
                 onFieldSubmitted: (_) {
-                  FocusScope.of(context).requestFocus(_quantityFocusNode);
+                  // Skip to price field if editing or category field if new item
+                  if (_isEditing) {
+                    FocusScope.of(context).requestFocus(_priceFocusNode);
+                  } else {
+                    FocusScope.of(context).requestFocus(_quantityFocusNode);
+                  }
                 },
                 decoration: const InputDecoration(
                   labelText: 'Item Name',
@@ -277,33 +284,39 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
                 },
               ),
               const SizedBox(height: 16),
-              TextFormField(
-                controller: _quantityController,
-                focusNode: _quantityFocusNode,
-                textInputAction: TextInputAction.next,
-                onFieldSubmitted: (_) {
-                  FocusScope.of(context).requestFocus(_priceFocusNode);
-                },
-                decoration: const InputDecoration(
-                  labelText: 'Quantity',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.numbers),
+              
+              // Only show quantity field when creating a new item
+              if (!_isEditing)
+                TextFormField(
+                  controller: _quantityController,
+                  focusNode: _quantityFocusNode,
+                  textInputAction: TextInputAction.next,
+                  onFieldSubmitted: (_) {
+                    FocusScope.of(context).requestFocus(_priceFocusNode);
+                  },
+                  decoration: const InputDecoration(
+                    labelText: 'Quantity',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.numbers),
+                  ),
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter quantity';
+                    }
+                    if (int.tryParse(value) == null) {
+                      return 'Quantity must be a number';
+                    }
+                    if (int.parse(value) < 0) {
+                      return 'Quantity cannot be negative';
+                    }
+                    return null;
+                  },
                 ),
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter quantity';
-                  }
-                  if (int.tryParse(value) == null) {
-                    return 'Quantity must be a number';
-                  }
-                  if (int.parse(value) < 0) {
-                    return 'Quantity cannot be negative';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
+              
+              if (!_isEditing)
+                const SizedBox(height: 16),
+                
               Row(
                 children: [
                   Expanded(

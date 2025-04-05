@@ -230,6 +230,7 @@ class _ItemTransactionScreenState extends State<ItemTransactionScreen> {
               
               const SizedBox(height: 16),
               
+              // Price field - readonly for sales, editable for restock
               TextFormField(
                 controller: _priceController,
                 focusNode: _priceFocusNode,
@@ -237,15 +238,18 @@ class _ItemTransactionScreenState extends State<ItemTransactionScreen> {
                 onFieldSubmitted: (_) {
                   FocusScope.of(context).requestFocus(_notesFocusNode);
                 },
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Unit Price (\$)',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.attach_money),
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.attach_money),
+                  helperText: isSale ? 'Fixed selling price' : null,
                 ),
                 keyboardType: TextInputType.number,
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
                 ],
+                readOnly: isSale,
+                enabled: !isSale,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please enter price';
